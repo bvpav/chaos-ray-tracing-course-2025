@@ -28,9 +28,9 @@ int main(int argc, char *argv[]) {
             float distance_x = screen_x - IMAGE_WIDTH / 2.0f;
             float distance_y = screen_y - IMAGE_HEIGHT / 2.0f;
 
-            float distance = std::sqrt(distance_x * distance_x + distance_y * distance_y);
+            float distance_squared = distance_x * distance_x + distance_y * distance_y;
 
-            if (distance <= CIRCLE_RADIUS) {
+            if (distance_squared <= CIRCLE_RADIUS * CIRCLE_RADIUS) {
                 output_file << "58 118 25 ";
             } else {
                 output_file << "183 183 183 ";
