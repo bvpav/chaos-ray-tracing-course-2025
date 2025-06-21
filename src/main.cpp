@@ -2,14 +2,13 @@
 #include <fstream>
 #include <cstdint>
 #include <algorithm>
-#include <cmath>
 
-static constexpr int IMAGE_WIDTH = 887;
-static constexpr int IMAGE_HEIGHT = 665;
+#include "crt_ray.h"
+
+static constexpr int RESOLUTION_X = 1920;
+static constexpr int RESOLUTION_Y = 1080;
 
 static constexpr int MAX_COLOR_COMPONENT = 0xFF;
-
-static constexpr int CIRCLE_RADIUS = 150;
 
 int main(int argc, char *argv[]) {
     auto output_path = argc > 1 ? argv[1] : "output.ppm";
@@ -20,21 +19,36 @@ int main(int argc, char *argv[]) {
     }
 
     output_file << "P3\n"
-                << IMAGE_WIDTH << ' ' << IMAGE_HEIGHT << '\n'
+                << RESOLUTION_X << ' ' << RESOLUTION_Y << '\n'
                 << MAX_COLOR_COMPONENT << '\n';
 
-    for (int screen_y = 0; screen_y < IMAGE_HEIGHT; ++screen_y) {
-        for (int screen_x = 0; screen_x < IMAGE_WIDTH; ++screen_x) {
-            float distance_x = screen_x - IMAGE_WIDTH / 2.0f;
-            float distance_y = screen_y - IMAGE_HEIGHT / 2.0f;
+    for (int raster_y = 0; raster_y < RESOLUTION_Y; ++raster_y) {
+        for (int raster_x = 0; raster_x < RESOLUTION_X; ++raster_x) {
+            crt::Ray ray;
 
-            float distance_squared = distance_x * distance_x + distance_y * distance_y;
+            // Pixel center in raster space
+            ray.direction = { raster_x + 0.5f, raster_y + 0.5f, 0.0f };
 
-            if (distance_squared <= CIRCLE_RADIUS * CIRCLE_RADIUS) {
-                output_file << "58 118 25 ";
-            } else {
-                output_file << "183 183 183 ";
-            }
+            // Raster space to NDC space
+            ray.direction.x /= RESOLUTION_X;
+            ray.direction.y /= RESOLUTION_Y;
+
+            // NDC space to screen space
+            ray.direction.x = (2.0f * ray.direction.x) - 1.0f;
+            ray.direction.y = 1.0f - (2.0f * ray.direction.y);
+
+            // Consider aspect ratio
+            ray.direction.x *= float(RESOLUTION_X) / RESOLUTION_Y;
+
+            ray.direction.z = -1.0f;
+            ray.direction = ray.direction.normalized();
+
+            ray.origin = { 0.0f, 0.0f, 0.0f };
+
+            crt::Vector color = (ray.direction * 0.5f + 0.5f) * MAX_COLOR_COMPONENT;
+            output_file << static_cast<int>(color.x) << ' '
+                        << static_cast<int>(color.y) << ' '
+                        << static_cast<int>(color.z) << ' ';
         }
         output_file << '\n';
     }
