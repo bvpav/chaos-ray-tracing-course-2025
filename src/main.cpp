@@ -2,15 +2,14 @@
 #include <fstream>
 #include <cstdint>
 #include <algorithm>
+#include <cmath>
 
-static constexpr int IMAGE_WIDTH = 800;
-static constexpr int IMAGE_HEIGHT = 600;
+static constexpr int IMAGE_WIDTH = 887;
+static constexpr int IMAGE_HEIGHT = 665;
 
 static constexpr int MAX_COLOR_COMPONENT = 0xFF;
 
-static constexpr int RECTANGLE_COUNT = 4;
-static constexpr int NOISE_MIN = -MAX_COLOR_COMPONENT;
-static constexpr int NOISE_MAX = MAX_COLOR_COMPONENT / 3;
+static constexpr int CIRCLE_RADIUS = 150;
 
 int main(int argc, char *argv[]) {
     auto output_path = argc > 1 ? argv[1] : "output.ppm";
@@ -26,25 +25,16 @@ int main(int argc, char *argv[]) {
 
     for (int screen_y = 0; screen_y < IMAGE_HEIGHT; ++screen_y) {
         for (int screen_x = 0; screen_x < IMAGE_WIDTH; ++screen_x) {
-            int rect_h_index = screen_y / (IMAGE_HEIGHT / RECTANGLE_COUNT);
-            int rect_w_index = screen_x / (IMAGE_WIDTH / RECTANGLE_COUNT);
-            int rect_index = rect_h_index * RECTANGLE_COUNT + rect_w_index;
+            float distance_x = screen_x - IMAGE_WIDTH / 2.0f;
+            float distance_y = screen_y - IMAGE_HEIGHT / 2.0f;
 
-            // Resolve an adjacently unique color for each rectangle
-            int color_index = rect_index % 6 + 1;
-            int r = (color_index & 1) ? MAX_COLOR_COMPONENT : 0;
-            int g = (color_index & 2) ? MAX_COLOR_COMPONENT : 0;
-            int b = (color_index & 4) ? MAX_COLOR_COMPONENT : 0;
+            float distance = std::sqrt(distance_x * distance_x + distance_y * distance_y);
 
-            int noise_r = rand() % (NOISE_MAX - NOISE_MIN + 1) + NOISE_MIN;
-            int noise_g = rand() % (NOISE_MAX - NOISE_MIN + 1) + NOISE_MIN;
-            int noise_b = rand() % (NOISE_MAX - NOISE_MIN + 1) + NOISE_MIN;
-
-            r = std::clamp(r + noise_r, 0, MAX_COLOR_COMPONENT);
-            g = std::clamp(g + noise_g, 0, MAX_COLOR_COMPONENT);
-            b = std::clamp(b + noise_b, 0, MAX_COLOR_COMPONENT);
-
-            output_file << r << ' ' << g << ' ' << b << '\n';
+            if (distance <= CIRCLE_RADIUS) {
+                output_file << "58 118 25 ";
+            } else {
+                output_file << "183 183 183 ";
+            }
         }
         output_file << '\n';
     }
