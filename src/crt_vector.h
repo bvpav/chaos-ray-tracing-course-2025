@@ -38,6 +38,14 @@ struct Vector {
     Vector normalized() const {
         return *this / length();
     }
+    
+    Vector cross(const Vector &rhs) const {
+        return {
+            y * rhs.z - z * rhs.y,
+            z * rhs.x - x * rhs.z,
+            x * rhs.y - y * rhs.x
+        };
+    }
 };
 
 }
