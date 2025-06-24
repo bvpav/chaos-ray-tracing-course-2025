@@ -13,7 +13,13 @@ struct Triangle {
     Vector normal() const {
         Vector edge1 = vertices[1] - vertices[0];
         Vector edge2 = vertices[2] - vertices[0];
-        return edge2.cross(edge1).normalized();
+        return edge1.cross(edge2).normalized();
+    }
+
+    float area() const {
+        Vector edge1 = vertices[1] - vertices[0];
+        Vector edge2 = vertices[2] - vertices[0];
+        return edge1.cross(edge2).length() * 0.5;
     }
 };
 
