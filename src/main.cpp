@@ -12,7 +12,7 @@ static constexpr int RESOLUTION_Y = 1080;
 
 static constexpr int MAX_COLOR_COMPONENT = 0xFF;
 
-crt::Ray generate_camera_ray(int raster_x, int raster_y) {
+static crt::Ray generate_camera_ray(int raster_x, int raster_y) {
     crt::Ray ray;
 
     // Pixel center in raster space
@@ -38,34 +38,35 @@ crt::Ray generate_camera_ray(int raster_x, int raster_y) {
 }
 
 struct Intersection {
+    float distance;
     crt::Vector point;
     crt::Vector normal;
     std::size_t triangle_index;
 };
 
-std::optional<Intersection> ray_intersects_triangle(const crt::Ray &ray, const crt::Triangle &triangle) {
+static std::optional<Intersection> ray_intersect_triangle(const crt::Ray &ray, const crt::Triangle &triangle) {
     const auto &[v0, v1, v2] = triangle.vertices();
     const auto [e0, e1, e2] = triangle.edges();
 
     float ray_normal_dist = triangle.normal().dot(ray.direction);
-    if (std::abs(ray_normal_dist) < 1e-6) {
-        // Ray is parallel to the triangle
+    bool is_parallel_to_plane = std::abs(ray_normal_dist) < 1e-6;
+    if (is_parallel_to_plane) {
         return std::nullopt;
     }
 
     float origin_plane_dist = v0.dot(triangle.normal());
     bool is_back_face = origin_plane_dist < 0.0f;
     if (is_back_face) {
-        float hit_distance = origin_plane_dist / ray_normal_dist;
-        if (hit_distance < 0.0f) {
+        float intersection_distance = origin_plane_dist / ray_normal_dist;
+        if (intersection_distance < 0.0f) {
             return std::nullopt;
         }
 
-        crt::Vector intersection_point = ray.at(hit_distance);
+        crt::Vector intersection_point = ray.at(intersection_distance);
         if (triangle.normal().dot(e0.cross(intersection_point - v0)) > 0.0f
                 && triangle.normal().dot(e1.cross(intersection_point - v1)) > 0.0f
                 && triangle.normal().dot(e2.cross(intersection_point - v2)) > 0.0f) {
-            return { { intersection_point, triangle.normal(), 0 } };
+            return { { intersection_distance, intersection_point, triangle.normal(), 0 } };
         }
     }
 
@@ -83,7 +84,7 @@ int main(int argc, char *argv[]) {
     crt::Triangle triangle{
         { -1.75f, -1.75f, -3.0f },
         {  1.75f, -1.75f, -3.0f },
-        {  0.0f,  1.75f, -3.0f },
+        {  0.0f,   1.75f, -3.0f },
     };
 
     output_file << "P3\n"
@@ -93,11 +94,11 @@ int main(int argc, char *argv[]) {
     for (int raster_y = 0; raster_y < RESOLUTION_Y; ++raster_y) {
         for (int raster_x = 0; raster_x < RESOLUTION_X; ++raster_x) {
             crt::Ray camera_ray = generate_camera_ray(raster_x, raster_y);
-            if (auto intersection = ray_intersects_triangle(camera_ray, triangle)) {
-                crt::Vector color = (intersection->normal * 0.5f + 0.5f) * MAX_COLOR_COMPONENT;
-                output_file << static_cast<int>(color.x) << ' '
-                            << static_cast<int>(color.y) << ' '
-                            << static_cast<int>(color.z) << '\t';
+            if (auto intersection = ray_intersect_triangle(camera_ray, triangle)) {
+                int r = ((intersection->triangle_index + 1) * 73) % 256;
+                int g = ((intersection->triangle_index + 1) * 137) % 256;
+                int b = ((intersection->triangle_index + 1) * 199) % 256;
+                output_file << r << ' ' << g << ' ' << b << '\t';
             } else {
                 output_file << "0 0 0\t";
             }
