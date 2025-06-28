@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <algorithm>
 #include <optional>
+#include <span>
 
 #include "crt_ray.h"
 #include "crt_triangle.h"
@@ -73,6 +74,19 @@ static std::optional<Intersection> ray_intersect_triangle(const crt::Ray &ray, c
     return std::nullopt;
 }
 
+static std::optional<Intersection> ray_intersect_triangle_span(const crt::Ray &ray, const std::span<const crt::Triangle> &triangles) {
+    std::optional<Intersection> closest_intersection = std::nullopt;
+    for (const auto &triangle : triangles) {
+        if (auto intersection = ray_intersect_triangle(ray, triangle)) {
+            intersection->triangle_index = &triangle - triangles.data();
+            if (!closest_intersection || intersection->distance < closest_intersection->distance) {
+                closest_intersection = intersection;
+            }
+        }
+    }
+    return closest_intersection;
+}
+
 int main(int argc, char *argv[]) {
     auto output_path = argc > 1 ? argv[1] : "output.ppm";
     std::ofstream output_file(output_path, std::ios::out | std::ios::binary);
@@ -81,11 +95,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    crt::Triangle triangle{
-        {  0.5f,  0.5f, -3.0f },
-        {  1.9f, -0.9f, -1.5f },
-        {  1.8f,  1.5f, -2.0f },
-    };
+    const std::array<crt::Triangle, 3> triangles{{
+        { { 0.0f,   1.75f, -3.00f}, {-1.75f, -1.75f, -3.00f}, { 1.75f, -1.75f, -3.00f} },
+        { {-1.75f,  1.75f, -2.00f}, {-3.50f, -1.75f, -2.00f}, { 0.00f, -1.75f, -2.00f} },
+        { { 1.75f,  1.75f, -4.00f}, { 0.00f, -1.75f, -4.00f}, { 3.50f, -1.75f, -4.00f} }
+    }};
 
     output_file << "P3\n"
                 << RESOLUTION_X << ' ' << RESOLUTION_Y << '\n'
@@ -94,7 +108,7 @@ int main(int argc, char *argv[]) {
     for (int raster_y = 0; raster_y < RESOLUTION_Y; ++raster_y) {
         for (int raster_x = 0; raster_x < RESOLUTION_X; ++raster_x) {
             crt::Ray camera_ray = generate_camera_ray(raster_x, raster_y);
-            if (auto intersection = ray_intersect_triangle(camera_ray, triangle)) {
+            if (auto intersection = ray_intersect_triangle_span(camera_ray, triangles)) {
                 int r = ((intersection->triangle_index + 1) * 73) % 256;
                 int g = ((intersection->triangle_index + 1) * 137) % 256;
                 int b = ((intersection->triangle_index + 1) * 199) % 256;
