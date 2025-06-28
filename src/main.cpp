@@ -82,9 +82,9 @@ int main(int argc, char *argv[]) {
     }
 
     crt::Triangle triangle{
-        { -1.75f, -1.75f, -3.0f },
-        {  1.75f, -1.75f, -3.0f },
-        {  0.0f,   1.75f, -3.0f },
+        {  0.5f,  0.5f, -3.0f },
+        {  1.9f, -0.9f, -1.5f },
+        {  1.8f,  1.5f, -2.0f },
     };
 
     output_file << "P3\n"
