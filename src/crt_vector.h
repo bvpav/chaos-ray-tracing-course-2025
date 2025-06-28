@@ -27,6 +27,10 @@ struct Vector {
         return { x - rhs, y - rhs, z - rhs };
     }
 
+    Vector operator-() const {
+        return { -x, -y, -z };
+    }
+
     Vector operator*(float rhs) const {
         return { x * rhs, y * rhs, z * rhs };
     }
