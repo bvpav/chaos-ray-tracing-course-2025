@@ -6,6 +6,10 @@ namespace crt {
 
 struct Ray {
     Vector origin, direction;
+
+    Vector at(float t) const {
+        return origin + direction * t;
+    }
 };
 
 }  

@@ -46,6 +46,10 @@ struct Vector {
             x * rhs.y - y * rhs.x
         };
     }
+
+    float dot(const Vector &rhs) const {
+        return x * rhs.x + y * rhs.y + z * rhs.z;
+    }
 };
 
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 #include "crt_vector.h"
 
 namespace crt {
@@ -9,7 +11,7 @@ namespace crt {
  */
 class Triangle {
 public:
-    Triangle(const Vector& v0, const Vector& v1, const Vector& v2)
+    Triangle(const Vector &v0, const Vector &v1, const Vector &v2)
         : m_vertices{ v0, v1, v2 }
     {
         Vector edge0 = m_vertices[1] - m_vertices[0];
@@ -27,9 +29,31 @@ public:
         return edge0.cross(edge1).length() * 0.5;
     }
 
+    const std::array<Vector, 3> &vertices() const {
+        return m_vertices;
+    }
+
+    std::array<Vector, 3> edges() const {
+        return {
+            m_vertices[1] - m_vertices[0],
+            m_vertices[2] - m_vertices[1],
+            m_vertices[0] - m_vertices[2]
+        };
+    }
+
 private:
-    Vector m_vertices[3];
+    std::array<Vector, 3> m_vertices;
     Vector m_normal;
 };
 
+}
+
+namespace std {
+    template<>
+    struct tuple_size<crt::Triangle> : integral_constant<size_t, 3> {};
+    
+    template<size_t I>
+    struct tuple_element<I, crt::Triangle> {
+        using type = crt::Vector;
+    };
 }
