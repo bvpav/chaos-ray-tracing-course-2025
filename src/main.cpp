@@ -74,12 +74,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    crt::Camera camera(RESOLUTION_X, RESOLUTION_Y);
-    camera.pan(30 * std::numbers::pi_v<float> / 180.0);
-    const std::array<crt::Triangle, 3> triangles{{
-        { { 0.0f,   1.75f, -3.00f}, {-1.75f, -1.75f, -3.00f}, { 1.75f, -1.75f, -3.00f} },
-        { {-1.75f,  1.75f, -2.00f}, {-3.50f, -1.75f, -2.00f}, { 0.00f, -1.75f, -2.00f} },
-        { { 1.75f,  1.75f, -4.00f}, { 0.00f, -1.75f, -4.00f}, { 3.50f, -1.75f, -4.00f} }
+    crt::Transform transform{};
+    transform.location = { 2.0f, 2.0f, 2.0f };
+    crt::Camera camera(RESOLUTION_X, RESOLUTION_Y, transform);
+    const std::array<crt::Triangle, 1> triangles{{
+        { {-1.75f, -1.75f, -3.00f}, { 1.75f, -1.75f, -3.00f}, { 0.00f,  1.75f, -3.00f} },
     }};
 
     output_file << "P3\n"
