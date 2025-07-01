@@ -16,8 +16,28 @@ public:
 
     Ray generate_ray(int raster_x, int raster_y) const;
 
+    void dolly(float distance) {
+        m_transform.translate_local({ 0.0f, 0.0f, distance });
+    }
+
+    void truck(float distance) {
+        m_transform.translate_local({ distance, 0.0f, 0.0f });
+    }
+
+    void pedestal(float distance) {
+        m_transform.translate_local({ 0.0f, 0.0f, distance });
+    }
+
     void pan(float angle_radians) {
         m_transform.rotate_y(angle_radians);
+    }
+
+    void tilt(float angle_radians) {
+        m_transform.rotate_x(angle_radians);
+    }
+
+    void roll(float angle_radians) {
+        m_transform.rotate_z(angle_radians);
     }
 
 private:
