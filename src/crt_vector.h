@@ -3,47 +3,95 @@
 namespace crt {
 
 struct Vector {
-    float x, y, z;
+    union {
+        struct { float x, y, z; };
+        float data[3];
+    };
 
-    float length_squared() const {
+    constexpr float length_squared() const {
         return x * x + y * y + z * z;
     }
 
     float length() const;
 
-    Vector operator+(const Vector &rhs) const {
+    constexpr Vector operator+(const Vector &rhs) const {
         return { x + rhs.x, y + rhs.y, z + rhs.z };
     }
 
-    Vector operator+(float rhs) const {
+    constexpr Vector operator+(const float rhs) const {
         return { x + rhs, y + rhs, z + rhs };
     }
+    constexpr Vector& operator+=(const Vector &rhs) {
+        x += rhs.x;
+        y += rhs.y;
+        z += rhs.z;
+        return *this;
+    }
 
-    Vector operator-(const Vector &rhs) const {
+    constexpr Vector& operator+=(const float rhs) {
+        x += rhs;
+        y += rhs;
+        z += rhs;
+        return *this;
+    }
+    constexpr Vector operator-(const Vector &rhs) const {
         return { x - rhs.x, y - rhs.y, z - rhs.z };
     }
 
-    Vector operator-(float rhs) const {
+    constexpr Vector operator-(const float rhs) const {
         return { x - rhs, y - rhs, z - rhs };
     }
 
-    Vector operator-() const {
+    constexpr Vector operator-() const {
         return { -x, -y, -z };
     }
 
-    Vector operator*(float rhs) const {
+    constexpr Vector& operator-=(const Vector &rhs) {
+        x -= rhs.x;
+        y -= rhs.y;
+        z -= rhs.z;
+        return *this;
+    }
+
+    constexpr Vector& operator-=(const float rhs) {
+        x -= rhs;
+        y -= rhs;
+        z -= rhs;
+        return *this;
+    }
+
+    constexpr Vector operator*(const float rhs) const {
         return { x * rhs, y * rhs, z * rhs };
     }
 
-    Vector operator/(float rhs) const {
+    constexpr Vector& operator*=(const float rhs) {
+        x *= rhs;
+        y *= rhs;
+        z *= rhs;
+        return *this;
+    }
+
+    constexpr Vector operator/(const float rhs) const {
         return { x / rhs, y / rhs, z / rhs };
+    }
+
+    constexpr Vector &operator/=(const float rhs) {
+        x /= rhs;
+        y /= rhs;
+        z /= rhs;
+        return *this;
+    }
+
+    Vector &normalize() {
+        *this /= length();
+        return *this;
     }
 
     Vector normalized() const {
         return *this / length();
     }
     
-    Vector cross(const Vector &rhs) const {
+    constexpr Vector cross(const Vector &rhs) const {
         return {
             y * rhs.z - z * rhs.y,
             z * rhs.x - x * rhs.z,
@@ -51,7 +99,7 @@ struct Vector {
         };
     }
 
-    float dot(const Vector &rhs) const {
+    constexpr float dot(const Vector &rhs) const {
         return x * rhs.x + y * rhs.y + z * rhs.z;
     }
 };
