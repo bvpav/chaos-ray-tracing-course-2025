@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <optional>
 #include <span>
+#include <numbers>
 
 #include "crt_ray.h"
 #include "crt_triangle.h"
@@ -74,6 +75,12 @@ int main(int argc, char *argv[]) {
     }
 
     crt::Camera camera(RESOLUTION_X, RESOLUTION_Y);
+    camera.pan(30 * std::numbers::pi_v<float> / 180.0);
+    const std::array<crt::Triangle, 3> triangles{{
+        { { 0.0f,   1.75f, -3.00f}, {-1.75f, -1.75f, -3.00f}, { 1.75f, -1.75f, -3.00f} },
+        { {-1.75f,  1.75f, -2.00f}, {-3.50f, -1.75f, -2.00f}, { 0.00f, -1.75f, -2.00f} },
+        { { 1.75f,  1.75f, -4.00f}, { 0.00f, -1.75f, -4.00f}, { 3.50f, -1.75f, -4.00f} }
+    }};
 
     output_file << "P3\n"
                 << RESOLUTION_X << ' ' << RESOLUTION_Y << '\n'
@@ -82,13 +89,18 @@ int main(int argc, char *argv[]) {
     for (int raster_y = 0; raster_y < RESOLUTION_Y; ++raster_y) {
         for (int raster_x = 0; raster_x < RESOLUTION_X; ++raster_x) {
             crt::Ray camera_ray = camera.generate_ray(raster_x, raster_y);
-            if (auto intersection = ray_intersect_triangle_span(camera_ray, teapot::triangles)) {
-                crt::Vector light_direction{ -0.381451f, -0.724329f, -0.57432f };
-                float light_intensity = std::max(0.0f, intersection->normal.dot(-light_direction));
+            if (auto intersection = ray_intersect_triangle_span(camera_ray, triangles)) {
+                // crt::Vector light_direction{ -0.381451f, -0.724329f, -0.57432f };
+                // float light_intensity = std::max(0.0f, intersection->normal.dot(-light_direction));
 
-                output_file << static_cast<int>(light_intensity * MAX_COLOR_COMPONENT) << ' '
-                            << static_cast<int>(light_intensity * MAX_COLOR_COMPONENT) << ' '
-                            << static_cast<int>(light_intensity * MAX_COLOR_COMPONENT) << '\t';
+                // output_file << static_cast<int>(light_intensity * MAX_COLOR_COMPONENT) << ' '
+                //             << static_cast<int>(light_intensity * MAX_COLOR_COMPONENT) << ' '
+                //             << static_cast<int>(light_intensity * MAX_COLOR_COMPONENT) << '\t';
+
+                int r = ((intersection->triangle_index + 1) * 73) % 256;
+                int g = ((intersection->triangle_index + 1) * 137) % 256;
+                int b = ((intersection->triangle_index + 1) * 199) % 256;
+                output_file << r << ' ' << g << ' ' << b << '\t';
             } else {
                 output_file << "0 0 0\t";
             }
