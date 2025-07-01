@@ -7,6 +7,7 @@
 
 #include "crt_ray.h"
 #include "crt_triangle.h"
+#include "crt_camera.h"
 
 #include "model_teapot.h"
 
@@ -14,31 +15,6 @@ static constexpr int RESOLUTION_X = 1920;
 static constexpr int RESOLUTION_Y = 1080;
 
 static constexpr int MAX_COLOR_COMPONENT = 0xFF;
-
-static crt::Ray generate_camera_ray(int raster_x, int raster_y) {
-    crt::Ray ray;
-
-    // Pixel center in raster space
-    ray.direction = { raster_x + 0.5f, raster_y + 0.5f, 0.0f };
-
-    // Raster space to NDC space
-    ray.direction.x /= RESOLUTION_X;
-    ray.direction.y /= RESOLUTION_Y;
-
-    // NDC space to screen space
-    ray.direction.x = (2.0f * ray.direction.x) - 1.0f;
-    ray.direction.y = 1.0f - (2.0f * ray.direction.y);
-
-    // Consider aspect ratio
-    ray.direction.x *= float(RESOLUTION_X) / RESOLUTION_Y;
-
-    ray.direction.z = -1.0f;
-    ray.direction = ray.direction.normalized();
-
-    ray.origin = { 0.0f, 0.0f, 0.0f };
-
-    return ray;
-}
 
 struct Intersection {
     float distance;
@@ -57,9 +33,9 @@ static std::optional<Intersection> ray_intersect_triangle(const crt::Ray &ray, c
         return std::nullopt;
     }
 
-    float origin_plane_dist = v0.dot(triangle.normal());
-    bool is_back_face = origin_plane_dist < 0.0f;
-    if (is_back_face) {
+    float origin_plane_dist = triangle.normal().dot(v0 - ray.origin);
+    bool is_front_face = origin_plane_dist < 0.0f;
+    if (is_front_face) {
         float intersection_distance = origin_plane_dist / ray_normal_dist;
         if (intersection_distance < 0.0f) {
             return std::nullopt;
@@ -97,13 +73,15 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    crt::Camera camera(RESOLUTION_X, RESOLUTION_Y);
+
     output_file << "P3\n"
                 << RESOLUTION_X << ' ' << RESOLUTION_Y << '\n'
                 << MAX_COLOR_COMPONENT << '\n';
 
     for (int raster_y = 0; raster_y < RESOLUTION_Y; ++raster_y) {
         for (int raster_x = 0; raster_x < RESOLUTION_X; ++raster_x) {
-            crt::Ray camera_ray = generate_camera_ray(raster_x, raster_y);
+            crt::Ray camera_ray = camera.generate_ray(raster_x, raster_y);
             if (auto intersection = ray_intersect_triangle_span(camera_ray, teapot::triangles)) {
                 crt::Vector light_direction{ -0.381451f, -0.724329f, -0.57432f };
                 float light_intensity = std::max(0.0f, intersection->normal.dot(-light_direction));

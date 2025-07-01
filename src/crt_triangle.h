@@ -47,13 +47,3 @@ private:
 };
 
 }
-
-namespace std {
-    template<>
-    struct tuple_size<crt::Triangle> : integral_constant<size_t, 3> {};
-    
-    template<size_t I>
-    struct tuple_element<I, crt::Triangle> {
-        using type = crt::Vector;
-    };
-}
