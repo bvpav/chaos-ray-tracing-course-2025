@@ -9,6 +9,7 @@
 #include "crt_ray.h"
 #include "crt_triangle.h"
 #include "crt_camera.h"
+#include "crt_image.h"
 
 #include "model_teapot.h"
 
@@ -81,32 +82,22 @@ int main(int argc, char *argv[]) {
         { {-1.75f, -1.75f, -3.00f}, { 1.75f, -1.75f, -3.00f}, { 0.00f,  1.75f, -3.00f} },
     }};
 
-    output_file << "P3\n"
-                << camera.resolution_x() << ' ' << camera.resolution_y() << '\n'
-                << MAX_COLOR_COMPONENT << '\n';
+    crt::Image result{camera.resolution_x(), camera.resolution_y()};
 
     for (int raster_y = 0; raster_y < camera.resolution_y(); ++raster_y) {
         for (int raster_x = 0; raster_x < camera.resolution_x(); ++raster_x) {
             crt::Ray camera_ray = camera.generate_ray(raster_x, raster_y);
             if (auto intersection = ray_intersect_triangle_span(camera_ray, triangles)) {
-                // crt::Vector light_direction{ -0.381451f, -0.724329f, -0.57432f };
-                // float light_intensity = std::max(0.0f, intersection->normal.dot(-light_direction));
-
-                // output_file << static_cast<int>(light_intensity * MAX_COLOR_COMPONENT) << ' '
-                //             << static_cast<int>(light_intensity * MAX_COLOR_COMPONENT) << ' '
-                //             << static_cast<int>(light_intensity * MAX_COLOR_COMPONENT) << '\t';
-
-                int r = ((intersection->triangle_index + 1) * 73) % 256;
-                int g = ((intersection->triangle_index + 1) * 137) % 256;
-                int b = ((intersection->triangle_index + 1) * 199) % 256;
-                output_file << r << ' ' << g << ' ' << b << '\t';
+                crt::Vector light_direction{ -0.381451f, -0.724329f, -0.57432f };
+                float light_intensity = std::max(0.0f, intersection->normal.dot(-light_direction));
+                result.pixels[raster_y * result.width + raster_x] = crt::Color{light_intensity, light_intensity, light_intensity};
             } else {
-                output_file << "0 0 0\t";
+                result.pixels[raster_y * result.width + raster_x] = crt::Color{};
             }
         }
-        output_file << '\n';
     }
 
+    output_file << result.to_ppm(MAX_COLOR_COMPONENT);
     output_file.close();
     return 0;
 }
