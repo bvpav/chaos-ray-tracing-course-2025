@@ -40,6 +40,14 @@ public:
         m_transform.rotate_z(angle_radians);
     }
 
+    constexpr int resolution_x() const {
+        return m_resolution_x;
+    }
+
+    constexpr int resolution_y() const {
+        return m_resolution_y;
+    }
+
 private:
     int m_resolution_x, m_resolution_y;
     Transform m_transform;

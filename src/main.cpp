@@ -82,11 +82,11 @@ int main(int argc, char *argv[]) {
     }};
 
     output_file << "P3\n"
-                << RESOLUTION_X << ' ' << RESOLUTION_Y << '\n'
+                << camera.resolution_x() << ' ' << camera.resolution_y() << '\n'
                 << MAX_COLOR_COMPONENT << '\n';
 
-    for (int raster_y = 0; raster_y < RESOLUTION_Y; ++raster_y) {
-        for (int raster_x = 0; raster_x < RESOLUTION_X; ++raster_x) {
+    for (int raster_y = 0; raster_y < camera.resolution_y(); ++raster_y) {
+        for (int raster_x = 0; raster_x < camera.resolution_x(); ++raster_x) {
             crt::Ray camera_ray = camera.generate_ray(raster_x, raster_y);
             if (auto intersection = ray_intersect_triangle_span(camera_ray, triangles)) {
                 // crt::Vector light_direction{ -0.381451f, -0.724329f, -0.57432f };
