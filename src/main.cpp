@@ -104,20 +104,57 @@ static crt::Image render_image(const crt::Camera &camera, const std::span<const 
 }
 
 int main(int argc, char *argv[]) {
-    auto output_path = argc > 1 ? argv[1] : "output.ppm";
-    std::ofstream output_file(output_path, std::ios::out | std::ios::binary);
-    if (!output_file.is_open()) {
-        std::cerr << "Error: Could not open file: " << output_path << '\n';
-        return 1;
+    std::array<std::string, 7> frames{ "before", "dolly", "truck", "pedestal", "pan", "tilt", "roll" };
+    std::vector<std::ofstream> output_files;
+    for (const auto &frame : frames) {
+        output_files.emplace_back("06-03-camera-animation-" + frame + ".ppm", std::ios::out | std::ios::binary);
+        if (!output_files.back().is_open()) {
+            std::cerr << "Error: Could not open file: " << frame << ".ppm\n";
+            return 1;
+        }
     }
 
-    crt::Transform transform{};
-    transform.location = { 2.0f, 2.0f, 2.0f };
-    crt::Camera camera(RESOLUTION_X, RESOLUTION_Y, transform);
+    {
+        crt::Camera camera{RESOLUTION_X, RESOLUTION_Y};
+        output_files[0] << render_image(camera, teapot::triangles).to_ppm(MAX_COLOR_COMPONENT);
 
-    crt::Image result = render_image(camera, teapot::triangles);
+        camera.dolly(1.0f);
+        output_files[1] << render_image(camera, teapot::triangles).to_ppm(MAX_COLOR_COMPONENT);
+    }
 
-    output_file << result.to_ppm(MAX_COLOR_COMPONENT);
-    output_file.close();
+    {
+        crt::Camera camera{RESOLUTION_X, RESOLUTION_Y};
+        camera.truck(1.0f);
+        output_files[2] << render_image(camera, teapot::triangles).to_ppm(MAX_COLOR_COMPONENT);
+    }
+
+    {
+        crt::Camera camera{RESOLUTION_X, RESOLUTION_Y};
+        camera.pedestal(1.0f);
+        output_files[3] << render_image(camera, teapot::triangles).to_ppm(MAX_COLOR_COMPONENT);
+    }
+
+    {
+        crt::Camera camera{RESOLUTION_X, RESOLUTION_Y};
+        camera.pan(1.0f);
+        output_files[4] << render_image(camera, teapot::triangles).to_ppm(MAX_COLOR_COMPONENT);
+    }
+
+    {
+        crt::Camera camera{RESOLUTION_X, RESOLUTION_Y};
+        camera.tilt(1.0f);
+        output_files[5] << render_image(camera, teapot::triangles).to_ppm(MAX_COLOR_COMPONENT);
+    }
+
+    {
+        crt::Camera camera{RESOLUTION_X, RESOLUTION_Y};
+        camera.roll(1.0f);
+        output_files[6] << render_image(camera, teapot::triangles).to_ppm(MAX_COLOR_COMPONENT);
+    }
+
+    for (auto &file : output_files) {
+        file.close();
+    }
+
     return 0;
 }
