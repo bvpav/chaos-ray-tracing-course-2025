@@ -86,17 +86,18 @@ int main(int argc, char *argv[]) {
 
     crt::Image result{camera.resolution_x(), camera.resolution_y()};
     
-    auto y_range = std::views::iota(0, camera.resolution_y());
-    std::for_each(std::execution::par_unseq, y_range.begin(), y_range.end(), [&](int raster_y) {
-        for (int raster_x = 0; raster_x < camera.resolution_x(); ++raster_x) {
-            crt::Ray camera_ray = camera.generate_ray(raster_x, raster_y);
-            if (auto intersection = ray_intersect_triangle_span(camera_ray, teapot::triangles)) {
-                crt::Vector light_direction{ -0.381451f, -0.724329f, -0.57432f };
-                float light_intensity = std::max(0.0f, intersection->normal.dot(-light_direction));
-                result.pixels[raster_y * result.width + raster_x] = crt::Color{light_intensity, light_intensity, light_intensity};
-            } else {
-                result.pixels[raster_y * result.width + raster_x] = crt::Color{};
-            }
+    auto range = std::views::iota(0, camera.resolution_x() * camera.resolution_y());
+    std::for_each(std::execution::par_unseq, range.begin(), range.end(), [&](int index) {
+        int raster_y = index / camera.resolution_x();
+        int raster_x = index % camera.resolution_x();
+
+        crt::Ray camera_ray = camera.generate_ray(raster_x, raster_y);
+        if (auto intersection = ray_intersect_triangle_span(camera_ray, teapot::triangles)) {
+            crt::Vector light_direction{ -0.381451f, -0.724329f, -0.57432f };
+            float light_intensity = std::max(0.0f, intersection->normal.dot(-light_direction));
+            result.pixels[raster_y * result.width + raster_x] = crt::Color{light_intensity, light_intensity, light_intensity};
+        } else {
+            result.pixels[raster_y * result.width + raster_x] = crt::Color{};
         }
     });
 
