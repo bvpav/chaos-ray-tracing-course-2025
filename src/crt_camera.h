@@ -25,7 +25,7 @@ public:
     }
 
     void pedestal(float distance) {
-        m_transform.translate_local({ 0.0f, 0.0f, distance });
+        m_transform.translate_local({ 0.0f, distance, 0.0f });
     }
 
     void pan(float angle_radians) {
