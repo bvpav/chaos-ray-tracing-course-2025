@@ -5,8 +5,7 @@
 #include <optional>
 #include <span>
 #include <numbers>
-#include <execution>
-#include <ranges>
+#include <thread>
 
 #include "crt_ray.h"
 #include "crt_triangle.h"
@@ -85,21 +84,36 @@ int main(int argc, char *argv[]) {
     }};
 
     crt::Image result{camera.resolution_x(), camera.resolution_y()};
-    
-    auto range = std::views::iota(0, camera.resolution_x() * camera.resolution_y());
-    std::for_each(std::execution::par_unseq, range.begin(), range.end(), [&](int index) {
-        int raster_y = index / camera.resolution_x();
-        int raster_x = index % camera.resolution_x();
+    {
+        const auto num_threads = std::thread::hardware_concurrency();
+        std::vector<std::jthread> threads;
+        threads.reserve(num_threads);
 
-        crt::Ray camera_ray = camera.generate_ray(raster_x, raster_y);
-        if (auto intersection = ray_intersect_triangle_span(camera_ray, teapot::triangles)) {
-            crt::Vector light_direction{ -0.381451f, -0.724329f, -0.57432f };
-            float light_intensity = std::max(0.0f, intersection->normal.dot(-light_direction));
-            result.pixels[raster_y * result.width + raster_x] = crt::Color{light_intensity, light_intensity, light_intensity};
-        } else {
-            result.pixels[raster_y * result.width + raster_x] = crt::Color{};
+        const auto rows_per_thread = camera.resolution_y() / num_threads;
+        const auto rows_remaining = camera.resolution_y() % num_threads;
+        for (int thread_index = 0; thread_index < num_threads; ++thread_index) {
+            int start_row = thread_index * rows_per_thread;
+            int end_row = start_row + rows_per_thread;
+            if (thread_index == num_threads - 1) {
+                end_row += rows_remaining;
+            }
+                
+            threads.emplace_back([&, start_row, end_row]() {
+                for (int raster_y = start_row; raster_y < end_row; ++raster_y) {
+                    for (int raster_x = 0; raster_x < camera.resolution_x(); ++raster_x) {
+                        crt::Ray camera_ray = camera.generate_ray(raster_x, raster_y);
+                        if (auto intersection = ray_intersect_triangle_span(camera_ray, teapot::triangles)) {
+                            crt::Vector light_direction{ -0.381451f, -0.724329f, -0.57432f };
+                            float light_intensity = std::max(0.0f, intersection->normal.dot(-light_direction));
+                            result.pixels[raster_y * result.width + raster_x] = crt::Color{light_intensity, light_intensity, light_intensity};
+                        } else {
+                            result.pixels[raster_y * result.width + raster_x] = crt::Color{};
+                        }
+                    }
+                }
+            });
         }
-    });
+    }
 
     output_file << result.to_ppm(MAX_COLOR_COMPONENT);
     output_file.close();
