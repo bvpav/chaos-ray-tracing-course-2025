@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+find_package(TBB REQUIRED)
+
 file(GLOB_RECURSE SOURCES
     "src/*.cpp"
     "src/*.h"
@@ -14,3 +16,5 @@ file(GLOB_RECURSE SOURCES
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE "src")
+
+target_link_libraries(${PROJECT_NAME} PRIVATE TBB::tbb)
