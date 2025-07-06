@@ -39,6 +39,14 @@ public:
     void roll(float angle_radians) {
         m_transform.rotate_z(angle_radians);
     }
+    
+    void pan_around(float angle_radians, const Vector &anchor) {
+        m_transform.rotate_y_around(angle_radians, anchor);
+    }
+
+    void tilt_around(float angle_radians, const Vector &anchor) {
+        m_transform.rotate_x_around(angle_radians, anchor);
+    }
 
     constexpr int resolution_x() const {
         return m_resolution_x;

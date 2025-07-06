@@ -1,12 +1,12 @@
 #include <iostream>
 #include <fstream>
-#include <sstream>
-#include <cstdint>
-#include <algorithm>
 #include <optional>
 #include <span>
 #include <numbers>
 #include <thread>
+#include <iomanip>
+#include <sstream>
+#include <cmath>
 
 #include "crt_ray.h"
 #include "crt_triangle.h"
@@ -19,6 +19,9 @@ static constexpr int RESOLUTION_X = 1920;
 static constexpr int RESOLUTION_Y = 1080;
 
 static constexpr int MAX_COLOR_COMPONENT = 0xFF;
+
+static constexpr int NUM_FRAMES = 72;
+static constexpr crt::Vector TURNTABLE_ORIGIN{0.026942f, 0.232549f, -2.4f};
 
 struct Intersection {
     float distance;
@@ -89,9 +92,10 @@ static crt::Image render_image(const crt::Camera &camera, const std::span<const 
             for (int raster_y = start_row; raster_y < end_row; ++raster_y) {
                 for (int raster_x = 0; raster_x < camera.resolution_x(); ++raster_x) {
                     crt::Ray camera_ray = camera.generate_ray(raster_x, raster_y);
-                    if (auto intersection = ray_intersect_triangle_span(camera_ray, teapot::triangles)) {
+                    if (auto intersection = ray_intersect_triangle_span(camera_ray, triangles)) {
                         crt::Vector light_direction{ -0.381451f, -0.724329f, -0.57432f };
-                        float light_intensity = std::max(0.0f, intersection->normal.dot(-light_direction));
+                        // float light_intensity = std::max(0.0f, intersection->normal.dot(-light_direction));
+                        float light_intensity = intersection->normal.dot(-light_direction) * 0.5f + 0.5f;
                         result.pixels[raster_y * result.width + raster_x] = crt::Color{light_intensity, light_intensity, light_intensity};
                     } else {
                         result.pixels[raster_y * result.width + raster_x] = crt::Color{};
@@ -105,43 +109,27 @@ static crt::Image render_image(const crt::Camera &camera, const std::span<const 
 }
 
 int main(int argc, char *argv[]) {
-    std::array<std::string, 7> frames{ "camera-animation", "dolly", "truck", "pedestal", "pan", "tilt", "roll" };
-    std::vector<std::ofstream> output_files;
-    std::stringstream ss;
-    ss << "06-04";
-    for (const auto &frame : frames) {
-        ss << '-' << frame;
-        output_files.emplace_back(ss.str() + ".ppm", std::ios::out | std::ios::binary);
-        if (!output_files.back().is_open()) {
-            std::cerr << "Error: Could not open file: " << ss.str() << '\n';
+    crt::Camera camera(RESOLUTION_X, RESOLUTION_Y);
+    camera.dolly(2.0f);
+
+    constexpr float rotation_per_frame = 360.0f / NUM_FRAMES * std::numbers::pi_v<float> / 180.0f;
+
+    auto output_name = argc > 1 ? argv[1] : "output";
+    for (int frame_index = 0; frame_index < NUM_FRAMES; ++frame_index) {
+        std::stringstream output_path;
+        output_path << output_name << "_" << std::setw(2) << std::setfill('0') << frame_index << ".ppm";
+        std::ofstream output_file(output_path.str(), std::ios::out | std::ios::binary);
+        if (!output_file.is_open()) {
+            std::cerr << "Error: Could not open file: " << output_name << '\n';
             return 1;
         }
+
+        crt::Image result = render_image(camera, teapot::triangles);
+
+        output_file << result.to_ppm(MAX_COLOR_COMPONENT);
+        output_file.close();
+
+        camera.pan_around(rotation_per_frame, TURNTABLE_ORIGIN);
     }
-
-    crt::Camera camera{RESOLUTION_X, RESOLUTION_Y};
-    // output_files[0] << render_image(camera, teapot::triangles).to_ppm(MAX_COLOR_COMPONENT);
-
-    camera.dolly(1.0f);
-    // output_files[1] << render_image(camera, teapot::triangles).to_ppm(MAX_COLOR_COMPONENT);
-
-    camera.truck(1.0f);
-    // output_files[2] << render_image(camera, teapot::triangles).to_ppm(MAX_COLOR_COMPONENT);
-
-    camera.pedestal(1.0f);
-    // output_files[3] << render_image(camera, teapot::triangles).to_ppm(MAX_COLOR_COMPONENT);
-
-    camera.pan(25.0f * std::numbers::pi_v<float> / 180.0f);
-    output_files[4] << render_image(camera, teapot::triangles).to_ppm(MAX_COLOR_COMPONENT);
-
-    camera.tilt(-25.0f * std::numbers::pi_v<float> / 180.0f);
-    output_files[5] << render_image(camera, teapot::triangles).to_ppm(MAX_COLOR_COMPONENT);
-
-    camera.roll(25.0f * std::numbers::pi_v<float> / 180.0f);
-    output_files[6] << render_image(camera, teapot::triangles).to_ppm(MAX_COLOR_COMPONENT);
-
-    for (auto &file : output_files) {
-        file.close();
-    }
-
     return 0;
 }
