@@ -1,4 +1,13 @@
 #include "crt_json.h"
+
+#include <cassert>
+#include <optional>
+#include <vector>
+
+#include "rapidjson/document.h"
+#include "rapidjson/istreamwrapper.h"
+#include "rapidjson/rapidjson.h"
+
 #include "crt_camera.h"
 #include "crt_image.h"
 #include "crt_matrix.h"
@@ -6,13 +15,6 @@
 #include "crt_scene.h"
 #include "crt_transform.h"
 #include "crt_vector.h"
-#include "rapidjson/document.h"
-#include "rapidjson/istreamwrapper.h"
-#include "rapidjson/rapidjson.h"
-#include <cassert>
-#include <optional>
-#include <type_traits>
-#include <vector>
 
 namespace crt::json {
 
