@@ -1,34 +1,31 @@
 #include <iostream>
 #include <fstream>
+#include <numbers>
 #include <optional>
 #include <span>
-#include <numbers>
 #include <thread>
-#include <iomanip>
-#include <sstream>
 #include <cmath>
 
 #include "crt_json.h"
+#include "crt_light.h"
+#include "crt_mesh.h"
 #include "crt_ray.h"
 #include "crt_scene.h"
 #include "crt_triangle.h"
 #include "crt_camera.h"
 #include "crt_image.h"
-
-#include "model_teapot.h"
+#include "crt_vector.h"
 
 static constexpr int RESOLUTION_X = 1920;
 static constexpr int RESOLUTION_Y = 1080;
 
 static constexpr int MAX_COLOR_COMPONENT = 0xFF;
 
-static constexpr int NUM_FRAMES = 72;
-static constexpr crt::Vector TURNTABLE_ORIGIN{0.026942f, 0.232549f, -2.4f};
-
 struct Intersection {
     float distance;
     crt::Vector point;
     crt::Vector normal;
+    int mesh_index;
 };
 
 static std::optional<Intersection> ray_intersect_triangle(const crt::Ray &ray, const crt::Triangle &triangle) {
@@ -42,19 +39,16 @@ static std::optional<Intersection> ray_intersect_triangle(const crt::Ray &ray, c
     }
 
     float origin_plane_dist = triangle.normal().dot(v0 - ray.origin);
-    bool is_front_face = origin_plane_dist < 0.0f;
-    if (is_front_face) {
-        float intersection_distance = origin_plane_dist / ray_normal_dist;
-        if (intersection_distance < 0.0f) {
-            return std::nullopt;
-        }
+    float intersection_distance = origin_plane_dist / ray_normal_dist;
+    if (intersection_distance < 0.0f) {
+        return std::nullopt;
+    }
 
-        crt::Vector intersection_point = ray.at(intersection_distance);
-        if (triangle.normal().dot(e0.cross(intersection_point - v0)) > 0.0f
-                && triangle.normal().dot(e1.cross(intersection_point - v1)) > 0.0f
-                && triangle.normal().dot(e2.cross(intersection_point - v2)) > 0.0f) {
-            return { { intersection_distance, intersection_point, triangle.normal() } };
-        }
+    crt::Vector intersection_point = ray.at(intersection_distance);
+    if (triangle.normal().dot(e0.cross(intersection_point - v0)) > 0.0f
+            && triangle.normal().dot(e1.cross(intersection_point - v1)) > 0.0f
+            && triangle.normal().dot(e2.cross(intersection_point - v2)) > 0.0f) {
+        return { { intersection_distance, intersection_point, triangle.normal(), 0 } };
     }
 
     return std::nullopt;
@@ -62,9 +56,10 @@ static std::optional<Intersection> ray_intersect_triangle(const crt::Ray &ray, c
 
 static std::optional<Intersection> ray_intersect_mesh_span(const crt::Ray &ray, std::span<const crt::Mesh> meshes) {
     std::optional<Intersection> closest_intersection = std::nullopt;
-    for (const auto &mesh : meshes) {
-        for (const auto &triangle : mesh.triangles()) {
+    for (size_t i = 0; i < meshes.size(); ++i) {
+        for (const auto &triangle : meshes[i].triangles) {
             if (auto intersection = ray_intersect_triangle(ray, triangle)) {
+                intersection->mesh_index = i;
                 if (!closest_intersection || intersection->distance < closest_intersection->distance) {
                     closest_intersection = intersection;
                 }
@@ -72,6 +67,40 @@ static std::optional<Intersection> ray_intersect_mesh_span(const crt::Ray &ray, 
         }
     }
     return closest_intersection;
+}
+
+static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene) {
+    constexpr float SHADOW_BIAS = 1e-2f;
+
+    if (auto intersection = ray_intersect_mesh_span(ray, scene.meshes)) {
+        crt::Color final_color{};
+        for (const auto &light : scene.lights) {
+            crt::Vector light_dir = light.position - intersection->point;
+            float sphere_radius_squared = light_dir.length_squared();
+            light_dir.normalize();
+
+            float cos_law = std::max(0.0f, light_dir.dot(intersection->normal));
+
+            crt::Color albedo{{
+                float(((intersection->mesh_index + 1) * 73) % (MAX_COLOR_COMPONENT + 1)) / MAX_COLOR_COMPONENT,
+                float(((intersection->mesh_index + 1) * 137) % (MAX_COLOR_COMPONENT + 1)) / MAX_COLOR_COMPONENT,
+                float(((intersection->mesh_index + 1) * 199) % (MAX_COLOR_COMPONENT + 1)) / MAX_COLOR_COMPONENT,
+            }};
+
+            float sphere_area = 4 * std::numbers::pi_v<float> * sphere_radius_squared;
+
+            crt::Ray shadow_ray{ intersection->point + intersection->normal * SHADOW_BIAS, light_dir };
+            bool is_illuminated = !ray_intersect_mesh_span(shadow_ray, scene.meshes).has_value();
+        
+            crt::Color light_contribution = is_illuminated
+                    ? albedo * light.intensity / sphere_area * cos_law
+                    : crt::Color{ 0.0f, 0.0f, 0.0f };
+            final_color += light_contribution;
+        }
+        return final_color;
+    } else {
+        return scene.background_color;
+    }
 }
 
 static crt::Image render_image(const crt::Scene &scene) {
@@ -94,14 +123,7 @@ static crt::Image render_image(const crt::Scene &scene) {
             for (int raster_y = start_row; raster_y < end_row; ++raster_y) {
                 for (int raster_x = 0; raster_x < scene.camera.resolution_x(); ++raster_x) {
                     crt::Ray camera_ray = scene.camera.generate_ray(raster_x, raster_y);
-                    if (auto intersection = ray_intersect_mesh_span(camera_ray, scene.meshes)) {
-                        crt::Vector light_direction{ -0.381451f, -0.724329f, -0.57432f };
-                        // float light_intensity = std::max(0.0f, intersection->normal.dot(-light_direction));
-                        float light_intensity = intersection->normal.dot(-light_direction) * 0.5f + 0.5f;
-                        result.pixels[raster_y * result.width + raster_x] = crt::Color{light_intensity, light_intensity, light_intensity};
-                    } else {
-                        result.pixels[raster_y * result.width + raster_x] = scene.background_color;
-                    }
+                    result.pixels[raster_y * result.width + raster_x] = shade_ray(camera_ray, scene);
                 }
             }
         });
@@ -111,7 +133,7 @@ static crt::Image render_image(const crt::Scene &scene) {
 }
 
 int main(int argc, char *argv[]) {
-    auto input_file_path = argc > 1 ? argv[1] : "../scenes/07-scene/scene0.crtscene";
+    auto input_file_path = argc > 1 ? argv[1] : "../scenes/08-01-light/scene1.crtscene";
 
     std::ifstream input_file{ input_file_path, std::ios::in | std::ios::binary };
     if (!input_file.is_open()) {

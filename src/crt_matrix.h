@@ -59,7 +59,7 @@ struct Matrix {
         Vector result{};
         for (int i = 0; i < 3; i++) {
             for (int j = 0; j < 3; j++) {
-                result.data[i] += rhs_mat.data[i][j] * lhs_vec.data[j];
+                result.data[i] += lhs_vec.data[j] * rhs_mat.data[j][i];
             }
         }
         return result;

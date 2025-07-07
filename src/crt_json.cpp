@@ -158,6 +158,35 @@ static std::optional<std::vector<Mesh>> get_meshes_from_value(const rapidjson::V
     return meshes;
 }
 
+static std::optional<std::vector<Light>> get_lights_from_value(const rapidjson::Value &value) {
+    if (!value.IsArray())
+        return std::nullopt;
+
+    std::vector<Light> lights;
+    lights.reserve(value.Size());
+
+    for (const auto &v : value.GetArray()) {
+        if (!v.IsObject())
+            return std::nullopt;
+
+        auto intensity_it = v.FindMember("intensity");
+        if (intensity_it == v.MemberEnd() || !intensity_it->value.IsNumber())
+            return std::nullopt;
+
+        auto position_it = v.FindMember("position");
+        if (position_it == v.MemberEnd())
+            return std::nullopt;
+
+        std::optional<Vector> position = get_vector_from_value(position_it->value);
+        if (!position)
+            return std::nullopt;
+
+        lights.emplace_back(intensity_it->value.GetFloat(), std::move(*position));
+    }
+
+    return lights;
+}
+
 std::optional<Scene> get_scene_from_istream(std::istream &is) {
     rapidjson::IStreamWrapper isw{is};
     rapidjson::Document doc;
@@ -195,7 +224,13 @@ std::optional<Scene> get_scene_from_istream(std::istream &is) {
     if (!meshes)
         return std::nullopt;
 
-    return Scene { std::move(*bg_color), std::move(*meshes), std::move(*camera) };
+    auto lights_it = doc.FindMember("lights");
+    if (lights_it == doc.MemberEnd())
+        return std::nullopt;
+
+    std::optional<std::vector<Light>> lights = get_lights_from_value(lights_it->value);
+
+    return Scene { std::move(*bg_color), std::move(*camera), std::move(*meshes), std::move(*lights) };
 }
 
 }
