@@ -1,6 +1,8 @@
 #pragma once
 
 #include <array>
+#include <tuple>
+#include <vector>
 
 #include "crt_vector.h"
 
@@ -12,10 +14,10 @@ namespace crt {
 class Triangle {
 public:
     Triangle(const Vector &v0, const Vector &v1, const Vector &v2)
-        : m_vertices{ v0, v1, v2 }
+        : m_v0(v0), m_v1(v1), m_v2(v2)
     {
-        Vector edge0 = m_vertices[1] - m_vertices[0];
-        Vector edge1 = m_vertices[2] - m_vertices[0];
+        Vector edge0 = m_v1 - m_v0;
+        Vector edge1 = m_v2 - m_v0;
         m_normal = edge0.cross(edge1).normalized();
     }
 
@@ -24,25 +26,25 @@ public:
     }
 
     float area() const {
-        Vector edge0 = m_vertices[1] - m_vertices[0];
-        Vector edge1 = m_vertices[2] - m_vertices[0];
+        Vector edge0 = m_v1 - m_v0;
+        Vector edge1 = m_v2 - m_v0;
         return edge0.cross(edge1).length() * 0.5;
     }
 
-    const std::array<Vector, 3> &vertices() const {
-        return m_vertices;
+    std::tuple<const crt::Vector &, const crt::Vector &, const crt::Vector &> vertices() const {
+        return { m_v0, m_v1, m_v2 };
     }
 
-    std::array<Vector, 3> edges() const {
+    std::tuple<crt::Vector, crt::Vector, crt::Vector> edges() const {
         return {
-            m_vertices[1] - m_vertices[0],
-            m_vertices[2] - m_vertices[1],
-            m_vertices[0] - m_vertices[2]
+            m_v1 - m_v0,
+            m_v2 - m_v1,
+            m_v0 - m_v2
         };
     }
 
 private:
-    std::array<Vector, 3> m_vertices;
+    const Vector &m_v0, &m_v1, &m_v2;
     Vector m_normal;
 };
 

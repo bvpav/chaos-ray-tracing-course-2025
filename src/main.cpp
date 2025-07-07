@@ -8,7 +8,9 @@
 #include <sstream>
 #include <cmath>
 
+#include "crt_json.h"
 #include "crt_ray.h"
+#include "crt_scene.h"
 #include "crt_triangle.h"
 #include "crt_camera.h"
 #include "crt_image.h"
@@ -27,7 +29,6 @@ struct Intersection {
     float distance;
     crt::Vector point;
     crt::Vector normal;
-    std::size_t triangle_index;
 };
 
 static std::optional<Intersection> ray_intersect_triangle(const crt::Ray &ray, const crt::Triangle &triangle) {
@@ -52,35 +53,36 @@ static std::optional<Intersection> ray_intersect_triangle(const crt::Ray &ray, c
         if (triangle.normal().dot(e0.cross(intersection_point - v0)) > 0.0f
                 && triangle.normal().dot(e1.cross(intersection_point - v1)) > 0.0f
                 && triangle.normal().dot(e2.cross(intersection_point - v2)) > 0.0f) {
-            return { { intersection_distance, intersection_point, triangle.normal(), 0 } };
+            return { { intersection_distance, intersection_point, triangle.normal() } };
         }
     }
 
     return std::nullopt;
 }
 
-static std::optional<Intersection> ray_intersect_triangle_span(const crt::Ray &ray, const std::span<const crt::Triangle> &triangles) {
+static std::optional<Intersection> ray_intersect_mesh_span(const crt::Ray &ray, std::span<const crt::Mesh> meshes) {
     std::optional<Intersection> closest_intersection = std::nullopt;
-    for (const auto &triangle : triangles) {
-        if (auto intersection = ray_intersect_triangle(ray, triangle)) {
-            intersection->triangle_index = &triangle - triangles.data();
-            if (!closest_intersection || intersection->distance < closest_intersection->distance) {
-                closest_intersection = intersection;
+    for (const auto &mesh : meshes) {
+        for (const auto &triangle : mesh.triangles()) {
+            if (auto intersection = ray_intersect_triangle(ray, triangle)) {
+                if (!closest_intersection || intersection->distance < closest_intersection->distance) {
+                    closest_intersection = intersection;
+                }
             }
         }
     }
     return closest_intersection;
 }
 
-static crt::Image render_image(const crt::Camera &camera, const std::span<const crt::Triangle> &triangles) {
-    crt::Image result{camera.resolution_x(), camera.resolution_y()};
+static crt::Image render_image(const crt::Scene &scene) {
+    crt::Image result{ scene.camera.resolution_x(), scene.camera.resolution_y() };
 
     const auto num_threads = std::thread::hardware_concurrency();
     std::vector<std::jthread> threads;
     threads.reserve(num_threads);
 
-    const auto rows_per_thread = camera.resolution_y() / num_threads;
-    const auto rows_remaining = camera.resolution_y() % num_threads;
+    const auto rows_per_thread = scene.camera.resolution_y() / num_threads;
+    const auto rows_remaining = scene.camera.resolution_y() % num_threads;
     for (int thread_index = 0; thread_index < num_threads; ++thread_index) {
         int start_row = thread_index * rows_per_thread;
         int end_row = start_row + rows_per_thread;
@@ -90,15 +92,15 @@ static crt::Image render_image(const crt::Camera &camera, const std::span<const 
             
         threads.emplace_back([&, start_row, end_row]() {
             for (int raster_y = start_row; raster_y < end_row; ++raster_y) {
-                for (int raster_x = 0; raster_x < camera.resolution_x(); ++raster_x) {
-                    crt::Ray camera_ray = camera.generate_ray(raster_x, raster_y);
-                    if (auto intersection = ray_intersect_triangle_span(camera_ray, triangles)) {
+                for (int raster_x = 0; raster_x < scene.camera.resolution_x(); ++raster_x) {
+                    crt::Ray camera_ray = scene.camera.generate_ray(raster_x, raster_y);
+                    if (auto intersection = ray_intersect_mesh_span(camera_ray, scene.meshes)) {
                         crt::Vector light_direction{ -0.381451f, -0.724329f, -0.57432f };
                         // float light_intensity = std::max(0.0f, intersection->normal.dot(-light_direction));
                         float light_intensity = intersection->normal.dot(-light_direction) * 0.5f + 0.5f;
                         result.pixels[raster_y * result.width + raster_x] = crt::Color{light_intensity, light_intensity, light_intensity};
                     } else {
-                        result.pixels[raster_y * result.width + raster_x] = crt::Color{};
+                        result.pixels[raster_y * result.width + raster_x] = scene.background_color;
                     }
                 }
             }
@@ -109,27 +111,28 @@ static crt::Image render_image(const crt::Camera &camera, const std::span<const 
 }
 
 int main(int argc, char *argv[]) {
-    crt::Camera camera(RESOLUTION_X, RESOLUTION_Y);
-    camera.dolly(2.0f);
+    auto input_file_path = argc > 1 ? argv[1] : "../scenes/07-scene/scene0.crtscene";
 
-    constexpr float rotation_per_frame = 360.0f / NUM_FRAMES * std::numbers::pi_v<float> / 180.0f;
-
-    auto output_name = argc > 1 ? argv[1] : "output";
-    for (int frame_index = 0; frame_index < NUM_FRAMES; ++frame_index) {
-        std::stringstream output_path;
-        output_path << output_name << "_" << std::setw(2) << std::setfill('0') << frame_index << ".ppm";
-        std::ofstream output_file(output_path.str(), std::ios::out | std::ios::binary);
-        if (!output_file.is_open()) {
-            std::cerr << "Error: Could not open file: " << output_name << '\n';
-            return 1;
-        }
-
-        crt::Image result = render_image(camera, teapot::triangles);
-
-        output_file << result.to_ppm(MAX_COLOR_COMPONENT);
-        output_file.close();
-
-        camera.pan_around(rotation_per_frame, TURNTABLE_ORIGIN);
+    std::ifstream input_file{ input_file_path, std::ios::in | std::ios::binary };
+    if (!input_file.is_open()) {
+        std::cerr << "Error: Could not open input file: " << input_file_path << '\n';
+        return 1;
     }
+
+    std::optional<crt::Scene> scene = crt::json::get_scene_from_istream(input_file);
+    if (!scene) {
+        std::cerr << "Error: Could not parse JSON file: " << input_file_path << '\n';
+        return 1;
+    }
+
+    auto output_file_path = argc > 2 ? argv[2] : "output.ppm";
+    std::ofstream output_file{ output_file_path, std::ios::out | std::ios::binary };
+    if (!output_file.is_open()) {
+        std::cerr << "Error: Could not open output file: " << output_file_path << '\n';
+        return 1;
+    }
+
+    output_file << render_image(*scene).to_ppm(MAX_COLOR_COMPONENT);
+
     return 0;
 }
