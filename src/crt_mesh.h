@@ -7,22 +7,14 @@
 
 #include "crt_triangle.h"
 #include "crt_vector.h"
+#include "crt_vertex.h"
 
 namespace crt {
 
 struct Mesh {
-    Mesh(std::vector<Vector> &&vertices, std::span<const int> indices)
-        : vertices(std::move(vertices))
-    {
-        assert(indices.size() % 3 == 0);
-        
-        triangles.reserve(indices.size() / 3);
-        for (size_t i = 0; i < indices.size(); i += 3) {
-            triangles.emplace_back(this->vertices[indices[i]], this->vertices[indices[i + 1]], this->vertices[indices[i + 2]]);
-        }
-    }
+    Mesh(std::span<const Vector> positions, std::span<const int> indices);
 
-    std::vector<Vector> vertices;
+    std::vector<Vertex> vertices;
     std::vector<Triangle> triangles;
 };
 
