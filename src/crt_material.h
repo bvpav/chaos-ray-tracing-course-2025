@@ -6,6 +6,7 @@ namespace crt {
 
 enum class MaterialType {
     Diffuse,
+    Reflective,
 };
 
 struct Material {

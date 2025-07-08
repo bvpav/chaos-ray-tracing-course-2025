@@ -71,6 +71,17 @@ struct Vector {
         return *this;
     }
 
+    constexpr Vector operator*(const Vector &rhs) const {
+        return { x * rhs.x, y * rhs.y * y, z * rhs.z };
+    }
+
+    constexpr Vector &operator*=(const Vector &rhs) {
+        x *= rhs.x;
+        y *= rhs.y;
+        z *= rhs.z;
+        return *this;
+    }
+
     constexpr Vector operator/(const float rhs) const {
         return { x / rhs, y / rhs, z / rhs };
     }
@@ -101,6 +112,16 @@ struct Vector {
 
     constexpr float dot(const Vector &rhs) const {
         return x * rhs.x + y * rhs.y + z * rhs.z;
+    }
+
+    constexpr Vector &reflect(const Vector &normal) {
+        *this -= normal * 2.0f * this->dot(normal);
+        return *this;
+    }
+    
+    constexpr Vector reflected(const Vector &normal) const {
+        Vector result = *this;
+        return result.reflect(normal);
     }
 };
 

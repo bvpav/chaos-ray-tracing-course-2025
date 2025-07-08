@@ -1,3 +1,4 @@
+#include <cassert>
 #include <iostream>
 #include <fstream>
 #include <optional>
@@ -87,35 +88,53 @@ static std::optional<Intersection> ray_intersect_mesh_span(const crt::Ray &ray, 
     return closest_intersection;
 }
 
-static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene) {
+static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const int ray_depth = 0) {
     constexpr float SHADOW_BIAS = 1e-2f;
+    constexpr int MAX_RAY_DEPTH = 5;
+
+    if (ray_depth > MAX_RAY_DEPTH)
+        return crt::Color{ 0.0f, 0.0f, 0.0f };
 
     if (auto intersection = ray_intersect_mesh_span(ray, scene.meshes)) {
-        crt::Color final_color{};
-        for (const auto &light : scene.lights) {
-            crt::Vector light_dir = light.position - intersection->point;
-            float sphere_radius_squared = light_dir.length_squared();
-            light_dir.normalize();
+        const crt::Material &material = scene.materials[intersection->material_index];
+        const crt::Vector &normal = material.smooth_shading
+                ? intersection->smooth_normal
+                : intersection->flat_normal;
 
-            const crt::Material &material = scene.materials[intersection->material_index];
-            const crt::Vector &normal = material.smooth_shading
-                    ? intersection->smooth_normal
-                    : intersection->flat_normal;
+        switch (material.type) {
+            case crt::MaterialType::Diffuse: {
+                crt::Color final_color{};
 
-            float cos_law = std::max(0.0f, light_dir.dot(normal));
+                for (const auto &light : scene.lights) {
+                    crt::Vector light_dir = light.position - intersection->point;
+                    float sphere_radius_squared = light_dir.length_squared();
+                    light_dir.normalize();
 
-            float sphere_area = 4 * std::numbers::pi_v<float> * sphere_radius_squared;
+                    float cos_law = std::max(0.0f, light_dir.dot(normal));
 
-            crt::Ray shadow_ray{ intersection->point + normal * SHADOW_BIAS, light_dir };
-            bool is_illuminated = !ray_intersect_mesh_span(shadow_ray, scene.meshes).has_value();
-        
-            const crt::Color light_contribution = is_illuminated
-                    ? material.albedo * light.intensity / sphere_area * cos_law
-                    : crt::Color{ 0.0f, 0.0f, 0.0f };
-            final_color += light_contribution;
+                    float sphere_area = 4 * std::numbers::pi_v<float> * sphere_radius_squared;
+
+                    crt::Ray shadow_ray{ intersection->point + normal * SHADOW_BIAS, light_dir };
+                    bool is_illuminated = !ray_intersect_mesh_span(shadow_ray, scene.meshes).has_value();
+                
+                    const crt::Color light_contribution = is_illuminated
+                            ? material.albedo * light.intensity / sphere_area * cos_law
+                            : crt::Color{ 0.0f, 0.0f, 0.0f };
+                    final_color += light_contribution;
+                }
+
+                return final_color;
+            }
+
+            case crt::MaterialType::Reflective: {
+                const crt::Ray reflection_ray{ intersection->point + normal * SHADOW_BIAS, ray.direction.reflected(normal) };
+                return material.albedo * shade_ray(reflection_ray, scene, ray_depth + 1);
+            }
+
+            default:
+                // std::unreachable() // FIXME: Use C++23 maybe?
+                assert(false);
         }
-
-        return final_color;
     } else {
         return scene.background_color;
     }
@@ -151,7 +170,7 @@ static crt::Image render_image(const crt::Scene &scene) {
 }
 
 int main(int argc, char *argv[]) {
-    auto input_file_path = argc > 1 ? argv[1] : "../scenes/09-02-diffuse-smooth-shading/scene2.crtscene";
+    auto input_file_path = argc > 1 ? argv[1] : "../scenes/09-03-reflective/scene4.crtscene";
 
     std::ifstream input_file{ input_file_path, std::ios::in | std::ios::binary };
     if (!input_file.is_open()) {

@@ -198,6 +198,8 @@ static std::optional<MaterialType> get_material_type_from_value(const rapidjson:
 
     if (string_value == "diffuse")
         return MaterialType::Diffuse;
+    if (string_value == "reflective")
+        return MaterialType::Reflective;
 
     return std::nullopt;
 }
