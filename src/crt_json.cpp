@@ -224,13 +224,15 @@ std::optional<Scene> get_scene_from_istream(std::istream &is) {
     if (!meshes)
         return std::nullopt;
 
-    auto lights_it = doc.FindMember("lights");
-    if (lights_it == doc.MemberEnd())
-        return std::nullopt;
+    // auto lights_it = doc.FindMember("lights");
+    // if (lights_it == doc.MemberEnd())
+    //     return std::nullopt;
 
-    std::optional<std::vector<Light>> lights = get_lights_from_value(lights_it->value);
+    // std::optional<std::vector<Light>> lights = get_lights_from_value(lights_it->value);
 
-    return Scene { std::move(*bg_color), std::move(*camera), std::move(*meshes), std::move(*lights) };
+    std::vector<Light> lights;
+
+    return Scene { std::move(*bg_color), std::move(*camera), std::move(*meshes), std::move(lights) };
 }
 
 }

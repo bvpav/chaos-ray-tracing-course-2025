@@ -25,6 +25,7 @@ struct Intersection {
     float distance;
     crt::Vector point;
     crt::Vector normal;
+    float barycentric_u, barycentric_v;
     int mesh_index;
 };
 
@@ -45,10 +46,15 @@ static std::optional<Intersection> ray_intersect_triangle(const crt::Ray &ray, c
     }
 
     crt::Vector intersection_point = ray.at(intersection_distance);
-    if (triangle.normal().dot(e0.cross(intersection_point - v0)) > 0.0f
-            && triangle.normal().dot(e1.cross(intersection_point - v1)) > 0.0f
-            && triangle.normal().dot(e2.cross(intersection_point - v2)) > 0.0f) {
-        return { { intersection_distance, intersection_point, triangle.normal(), 0 } };
+    crt::Vector v0p = intersection_point - v0, v1p = intersection_point - v1, v2p = intersection_point - v2;
+    if (triangle.normal().dot(e0.cross(v0p)) > 0.0f
+            && triangle.normal().dot(e1.cross(v1p)) > 0.0f
+            && triangle.normal().dot(e2.cross(v2p)) > 0.0f) {
+        const crt::Vector &v0v1 = e0;
+        crt::Vector v0v2 = -e2;
+        float barycentric_u = v0p.cross(v0v2).length() / v0v1.cross(v0v2).length();
+        float barycentric_v = v0v1.cross(v0p).length() / v0v1.cross(v0v2).length();
+        return { { intersection_distance, intersection_point, triangle.normal(), barycentric_u, barycentric_v, 0 } };
     }
 
     return std::nullopt;
@@ -73,31 +79,7 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene) {
     constexpr float SHADOW_BIAS = 1e-2f;
 
     if (auto intersection = ray_intersect_mesh_span(ray, scene.meshes)) {
-        crt::Color final_color{};
-        for (const auto &light : scene.lights) {
-            crt::Vector light_dir = light.position - intersection->point;
-            float sphere_radius_squared = light_dir.length_squared();
-            light_dir.normalize();
-
-            float cos_law = std::max(0.0f, light_dir.dot(intersection->normal));
-
-            crt::Color albedo{{
-                float(((intersection->mesh_index + 1) * 73) % (MAX_COLOR_COMPONENT + 1)) / MAX_COLOR_COMPONENT,
-                float(((intersection->mesh_index + 1) * 137) % (MAX_COLOR_COMPONENT + 1)) / MAX_COLOR_COMPONENT,
-                float(((intersection->mesh_index + 1) * 199) % (MAX_COLOR_COMPONENT + 1)) / MAX_COLOR_COMPONENT,
-            }};
-
-            float sphere_area = 4 * std::numbers::pi_v<float> * sphere_radius_squared;
-
-            crt::Ray shadow_ray{ intersection->point + intersection->normal * SHADOW_BIAS, light_dir };
-            bool is_illuminated = !ray_intersect_mesh_span(shadow_ray, scene.meshes).has_value();
-        
-            crt::Color light_contribution = is_illuminated
-                    ? albedo * light.intensity / sphere_area * cos_law
-                    : crt::Color{ 0.0f, 0.0f, 0.0f };
-            final_color += light_contribution;
-        }
-        return final_color;
+        return { intersection->barycentric_u, intersection->barycentric_v, 0.0f };
     } else {
         return scene.background_color;
     }
@@ -133,7 +115,7 @@ static crt::Image render_image(const crt::Scene &scene) {
 }
 
 int main(int argc, char *argv[]) {
-    auto input_file_path = argc > 1 ? argv[1] : "../scenes/08-01-light/scene1.crtscene";
+    auto input_file_path = argc > 1 ? argv[1] : "../scenes/09-01-barycentric-coordinates/scene1.crtscene";
 
     std::ifstream input_file{ input_file_path, std::ios::in | std::ios::binary };
     if (!input_file.is_open()) {
