@@ -5,6 +5,7 @@
 #include "crt_camera.h"
 #include "crt_image.h"
 #include "crt_light.h"
+#include "crt_material.h"
 #include "crt_mesh.h"
 
 namespace crt {
@@ -14,6 +15,7 @@ struct Scene {
     Camera camera;
     std::vector<Mesh> meshes;
     std::vector<Light> lights;
+    std::vector<Material> materials;
 };
 
 }

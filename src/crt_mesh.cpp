@@ -3,8 +3,8 @@
 
 namespace crt {
 
-Mesh::Mesh(std::span<const Vector> positions, std::span<const int> indices)
-    : vertices(positions.begin(), positions.end())
+Mesh::Mesh(std::span<const Vector> positions, std::span<const int> indices, int material_index)
+    : vertices(positions.begin(), positions.end()), material_index(material_index)
 {
     assert(indices.size() % 3 == 0);
     

@@ -6,6 +6,7 @@
 #include <cmath>
 
 #include "crt_json.h"
+#include "crt_material.h"
 #include "crt_mesh.h"
 #include "crt_ray.h"
 #include "crt_scene.h"
@@ -26,7 +27,7 @@ struct Intersection {
     //       shading is a property of the material and it's used in the shading stage.
     crt::Vector flat_normal, smooth_normal;
     float barycentric_u, barycentric_v;
-    int mesh_index;
+    int material_index;
 };
 
 static std::optional<Intersection> ray_intersect_triangle(const crt::Ray &ray, const crt::Triangle &triangle) {
@@ -73,10 +74,10 @@ static std::optional<Intersection> ray_intersect_triangle(const crt::Ray &ray, c
 
 static std::optional<Intersection> ray_intersect_mesh_span(const crt::Ray &ray, std::span<const crt::Mesh> meshes) {
     std::optional<Intersection> closest_intersection = std::nullopt;
-    for (size_t i = 0; i < meshes.size(); ++i) {
-        for (const auto &triangle : meshes[i].triangles) {
+    for (const auto &mesh : meshes) {
+        for (const auto &triangle : mesh.triangles) {
             if (auto intersection = ray_intersect_triangle(ray, triangle)) {
-                intersection->mesh_index = i;
+                intersection->material_index = mesh.material_index;
                 if (!closest_intersection || intersection->distance < closest_intersection->distance) {
                     closest_intersection = intersection;
                 }
@@ -96,23 +97,20 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene) {
             float sphere_radius_squared = light_dir.length_squared();
             light_dir.normalize();
 
-            crt::Vector normal = intersection->smooth_normal;
+            const crt::Material &material = scene.materials[intersection->material_index];
+            const crt::Vector &normal = material.smooth_shading
+                    ? intersection->smooth_normal
+                    : intersection->flat_normal;
 
             float cos_law = std::max(0.0f, light_dir.dot(normal));
-
-            crt::Color albedo{{
-                float(((intersection->mesh_index + 1) * 73) % (MAX_COLOR_COMPONENT + 1)) / MAX_COLOR_COMPONENT,
-                float(((intersection->mesh_index + 1) * 137) % (MAX_COLOR_COMPONENT + 1)) / MAX_COLOR_COMPONENT,
-                float(((intersection->mesh_index + 1) * 199) % (MAX_COLOR_COMPONENT + 1)) / MAX_COLOR_COMPONENT,
-            }};
 
             float sphere_area = 4 * std::numbers::pi_v<float> * sphere_radius_squared;
 
             crt::Ray shadow_ray{ intersection->point + normal * SHADOW_BIAS, light_dir };
             bool is_illuminated = !ray_intersect_mesh_span(shadow_ray, scene.meshes).has_value();
         
-            crt::Color light_contribution = is_illuminated
-                    ? albedo * light.intensity / sphere_area * cos_law
+            const crt::Color light_contribution = is_illuminated
+                    ? material.albedo * light.intensity / sphere_area * cos_law
                     : crt::Color{ 0.0f, 0.0f, 0.0f };
             final_color += light_contribution;
         }
@@ -153,7 +151,7 @@ static crt::Image render_image(const crt::Scene &scene) {
 }
 
 int main(int argc, char *argv[]) {
-    auto input_file_path = argc > 1 ? argv[1] : "../scenes/09-02-albedo-smooth-shading/scene2.crtscene";
+    auto input_file_path = argc > 1 ? argv[1] : "../scenes/09-02-diffuse-smooth-shading/scene2.crtscene";
 
     std::ifstream input_file{ input_file_path, std::ios::in | std::ios::binary };
     if (!input_file.is_open()) {

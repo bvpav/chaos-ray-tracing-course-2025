@@ -8,6 +8,8 @@
 #include "rapidjson/istreamwrapper.h"
 #include "rapidjson/rapidjson.h"
 
+#include "crt_light.h"
+#include "crt_material.h"
 #include "crt_camera.h"
 #include "crt_image.h"
 #include "crt_matrix.h"
@@ -144,6 +146,10 @@ static std::optional<std::vector<Mesh>> get_meshes_from_value(const rapidjson::V
         if (indices_it == v.MemberEnd())
             return std::nullopt;
 
+        auto material_index_it = v.FindMember("material_index");
+        if (material_index_it == v.MemberEnd() || !material_index_it->value.IsInt())
+            return std::nullopt;
+
         std::optional<std::vector<Vector>> vertices = get_vector_array_from_value(vertices_it->value);
         if (!vertices)
             return std::nullopt;
@@ -152,7 +158,7 @@ static std::optional<std::vector<Mesh>> get_meshes_from_value(const rapidjson::V
         if (!indices)
             return std::nullopt;
 
-        meshes.emplace_back(std::move(*vertices), std::move(*indices));
+        meshes.emplace_back(std::move(*vertices), std::move(*indices), material_index_it->value.GetInt());
     }
 
     return meshes;
@@ -185,6 +191,52 @@ static std::optional<std::vector<Light>> get_lights_from_value(const rapidjson::
     }
 
     return lights;
+}
+
+static std::optional<MaterialType> get_material_type_from_value(const rapidjson::Value &string_value) {
+    assert(string_value.IsString());
+
+    if (string_value == "diffuse")
+        return MaterialType::Diffuse;
+
+    return std::nullopt;
+}
+
+static std::optional<std::vector<Material>> get_materials_from_value(const rapidjson::Value &value) {
+    if (!value.IsArray())
+        return std::nullopt;
+
+    std::vector<Material> materials;
+    materials.reserve(value.Size());
+
+    for (const auto &v : value.GetArray()) {
+        if (!v.IsObject())
+            return std::nullopt;
+
+        auto type_it = v.FindMember("type");
+        if (type_it == v.MemberEnd() || !type_it->value.IsString())
+            return std::nullopt;
+
+        auto albedo_it = v.FindMember("albedo");
+        if (albedo_it == v.MemberEnd())
+            return std::nullopt;
+
+        auto smooth_shading_it = v.FindMember("smooth_shading");
+        if (smooth_shading_it == v.MemberEnd() || !smooth_shading_it->value.IsBool())
+            return std::nullopt;
+
+        std::optional<Color> albedo = get_vector_from_value(albedo_it->value);
+        if (!albedo)
+            return std::nullopt;
+
+        std::optional<MaterialType> type = get_material_type_from_value(type_it->value);
+        if (type == std::nullopt)
+            return std::nullopt;
+
+        materials.emplace_back(*type, std::move(*albedo), smooth_shading_it->value.GetBool());
+    }
+
+    return materials;
 }
 
 std::optional<Scene> get_scene_from_istream(std::istream &is) {
@@ -229,8 +281,18 @@ std::optional<Scene> get_scene_from_istream(std::istream &is) {
         return std::nullopt;
 
     std::optional<std::vector<Light>> lights = get_lights_from_value(lights_it->value);
+    if (!lights)
+        return std::nullopt;
 
-    return Scene { std::move(*bg_color), std::move(*camera), std::move(*meshes), std::move(*lights) };
+    auto materials_it = doc.FindMember("materials");
+    if (materials_it == doc.MemberEnd())
+        return std::nullopt;
+
+    std::optional<std::vector<Material>> materials = get_materials_from_value(materials_it->value);
+    if (!materials)
+        return std::nullopt;
+
+    return Scene { std::move(*bg_color), std::move(*camera), std::move(*meshes), std::move(*lights), std::move(*materials) };
 }
 
 }
