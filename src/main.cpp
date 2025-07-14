@@ -182,6 +182,10 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene) {
                 }
             }
 
+            case crt::MaterialType::Constant: {
+                return material.albedo;
+            }
+
             default:
                 // std::unreachable() // FIXME: Use C++23 maybe?
                 assert(false);

@@ -8,6 +8,7 @@ enum class MaterialType {
     Diffuse,
     Reflective,
     Refractive,
+    Constant,
 };
 
 struct Material {

@@ -197,13 +197,14 @@ static std::optional<std::vector<Light>> get_lights_from_value(const rapidjson::
 static std::optional<MaterialType> get_material_type_from_value(const rapidjson::Value &string_value) {
     assert(string_value.IsString());
 
-    // TODO: support proper constant shading
-    if (string_value == "diffuse" || string_value == "constant")
+    if (string_value == "diffuse")
         return MaterialType::Diffuse;
     if (string_value == "reflective")
         return MaterialType::Reflective;
     if (string_value == "refractive")
         return MaterialType::Refractive;
+    if (string_value == "constant")
+        return MaterialType::Constant;
 
     return std::nullopt;
 }
