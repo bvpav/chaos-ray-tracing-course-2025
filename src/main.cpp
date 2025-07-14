@@ -19,7 +19,15 @@
 static constexpr int RESOLUTION_X = 1920;
 static constexpr int RESOLUTION_Y = 1080;
 
+// TODO: move to configuration
+
 static constexpr int MAX_COLOR_COMPONENT = 0xFF;
+
+constexpr int MAX_RAY_DEPTH = 5;
+
+constexpr float SHADOW_BIAS = 1e-2f;
+constexpr float REFLECTION_BIAS = 1e-2f;
+constexpr float REFRACTION_BIAS = 1e-2f;
 
 struct Intersection {
     float distance;
@@ -29,6 +37,10 @@ struct Intersection {
     crt::Vector flat_normal, smooth_normal;
     float barycentric_u, barycentric_v;
     int material_index;
+
+    const crt::Vector &normal(const crt::Material &material) const {
+        return material.smooth_shading ? smooth_normal : flat_normal;
+    }
 };
 
 static std::optional<Intersection> ray_intersect_triangle(const crt::Ray &ray, const crt::Triangle &triangle) {
@@ -49,9 +61,9 @@ static std::optional<Intersection> ray_intersect_triangle(const crt::Ray &ray, c
 
     crt::Vector intersection_point = ray.at(intersection_distance);
     crt::Vector v0p = intersection_point - v0.position, v1p = intersection_point - v1.position, v2p = intersection_point - v2.position;
-    if (triangle.normal().dot(e0.cross(v0p)) > 0.0f
-            && triangle.normal().dot(e1.cross(v1p)) > 0.0f
-            && triangle.normal().dot(e2.cross(v2p)) > 0.0f)
+    if (triangle.normal().dot(e0.cross(v0p)) >= 0.0f
+            && triangle.normal().dot(e1.cross(v1p)) >= 0.0f
+            && triangle.normal().dot(e2.cross(v2p)) >= 0.0f)
     {
         const crt::Vector &v0v1 = e0;
         crt::Vector v0v2 = -e2;
@@ -88,18 +100,34 @@ static std::optional<Intersection> ray_intersect_mesh_span(const crt::Ray &ray, 
     return closest_intersection;
 }
 
-static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const int ray_depth = 0) {
-    constexpr float SHADOW_BIAS = 1e-2f;
-    constexpr int MAX_RAY_DEPTH = 5;
+static std::optional<Intersection> trace_ray(const crt::Ray &ray, const crt::Scene &scene) {
+    return ray_intersect_mesh_span(ray, scene.meshes);
+}
 
-    if (ray_depth > MAX_RAY_DEPTH)
+static std::optional<Intersection> trace_ray_with_refractions(const crt::Ray &ray, const crt::Scene &scene, const float refraction_bias) {
+    crt::Ray r = ray;
+    std::optional<Intersection> closest_intersection;
+    bool has_refracted = false;
+    while (has_refracted && r.depth <= MAX_RAY_DEPTH) {
+        closest_intersection = ray_intersect_mesh_span(ray, scene.meshes);
+        if (closest_intersection) {
+            const auto material = scene.materials[closest_intersection->material_index];
+            has_refracted = material.type == crt::MaterialType::Refractive;
+            if (has_refracted) {
+                has_refracted = r.refract_at(closest_intersection->point, closest_intersection->normal(material), material.ior, refraction_bias);
+            }
+        }
+    }
+    return closest_intersection;
+}
+
+static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene) {
+    if (ray.depth > MAX_RAY_DEPTH)
         return crt::Color{ 0.0f, 0.0f, 0.0f };
 
-    if (auto intersection = ray_intersect_mesh_span(ray, scene.meshes)) {
+    if (auto intersection = trace_ray(ray, scene)) {
         const crt::Material &material = scene.materials[intersection->material_index];
-        const crt::Vector &normal = material.smooth_shading
-                ? intersection->smooth_normal
-                : intersection->flat_normal;
+        crt::Vector normal = intersection->normal(material);
 
         switch (material.type) {
             case crt::MaterialType::Diffuse: {
@@ -115,20 +143,43 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const 
                     float sphere_area = 4 * std::numbers::pi_v<float> * sphere_radius_squared;
 
                     crt::Ray shadow_ray{ intersection->point + normal * SHADOW_BIAS, light_dir };
-                    bool is_illuminated = !ray_intersect_mesh_span(shadow_ray, scene.meshes).has_value();
-                
-                    const crt::Color light_contribution = is_illuminated
-                            ? material.albedo * light.intensity / sphere_area * cos_law
-                            : crt::Color{ 0.0f, 0.0f, 0.0f };
-                    final_color += light_contribution;
+                    auto shadow_intersection = trace_ray_with_refractions(shadow_ray, scene, REFRACTION_BIAS);
+                    bool is_illuminated = !shadow_intersection.has_value() || shadow_intersection->distance * shadow_intersection->distance > sphere_radius_squared;
+                    if (is_illuminated) {
+                        final_color += material.albedo * light.intensity / sphere_area * cos_law;
+                    }
                 }
 
                 return final_color;
             }
 
             case crt::MaterialType::Reflective: {
-                const crt::Ray reflection_ray{ intersection->point + normal * SHADOW_BIAS, ray.direction.reflected(normal) };
-                return material.albedo * shade_ray(reflection_ray, scene, ray_depth + 1);
+                return material.albedo * shade_ray(ray.reflected_at(intersection->point, normal, REFLECTION_BIAS), scene);
+            }
+
+            case crt::MaterialType::Refractive: {
+                // HACK: Assuming the external environment is always air and when rays
+                //       leave transparent objects, they always enter air.
+                float outside_ior = 1.0f;
+                float inside_ior = material.ior;
+                if (ray.direction.dot(normal) > 0.0f) {
+                    // Ray is leaving the refractive volume
+                    normal = -normal;
+                    std::swap(inside_ior, outside_ior);
+                }
+
+                std::optional<crt::Ray> refraction_ray = ray.refracted_at(intersection->point, normal, outside_ior, inside_ior, REFRACTION_BIAS);
+                crt::Ray reflection_ray = ray.reflected_at(intersection->point, normal, REFLECTION_BIAS);
+
+                crt::Color reflection_color = shade_ray(reflection_ray, scene);
+
+                if (refraction_ray) {
+                    crt::Color refraction_color = shade_ray(*refraction_ray, scene);
+                    float fresnel = 0.5f * std::pow((1.0f + ray.direction.dot(normal)), 5.0f);
+                    return reflection_color * fresnel + refraction_color * (1.0f - fresnel);
+                } else {
+                    return reflection_color;
+                }
             }
 
             default:
@@ -170,7 +221,7 @@ static crt::Image render_image(const crt::Scene &scene) {
 }
 
 int main(int argc, char *argv[]) {
-    auto input_file_path = argc > 1 ? argv[1] : "../scenes/09-03-reflective/scene4.crtscene";
+    auto input_file_path = argc > 1 ? argv[1] : "../scenes/11-01-refractive/scene1.crtscene";
 
     std::ifstream input_file{ input_file_path, std::ios::in | std::ios::binary };
     if (!input_file.is_open()) {

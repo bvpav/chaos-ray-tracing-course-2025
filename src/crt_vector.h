@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 namespace crt {
 
 struct Vector {
@@ -122,6 +124,15 @@ struct Vector {
     constexpr Vector reflected(const Vector &normal) const {
         Vector result = *this;
         return result.reflect(normal);
+    }
+
+    bool refract(Vector normal, float outside_ior, float inside_ior);
+
+    std::optional<Vector> refracted(const Vector &normal, const float inside_ior, const float outside_ior) const {
+        Vector result = *this;
+        if (!result.refract(normal, outside_ior, inside_ior))
+            return std::nullopt;
+        return result;
     }
 };
 
