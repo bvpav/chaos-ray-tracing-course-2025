@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include "rapidjson/document.h"
@@ -196,10 +197,13 @@ static std::optional<std::vector<Light>> get_lights_from_value(const rapidjson::
 static std::optional<MaterialType> get_material_type_from_value(const rapidjson::Value &string_value) {
     assert(string_value.IsString());
 
-    if (string_value == "diffuse")
+    // TODO: support proper constant shading
+    if (string_value == "diffuse" || string_value == "constant")
         return MaterialType::Diffuse;
     if (string_value == "reflective")
         return MaterialType::Reflective;
+    if (string_value == "refractive")
+        return MaterialType::Refractive;
 
     return std::nullopt;
 }
@@ -219,23 +223,39 @@ static std::optional<std::vector<Material>> get_materials_from_value(const rapid
         if (type_it == v.MemberEnd() || !type_it->value.IsString())
             return std::nullopt;
 
-        auto albedo_it = v.FindMember("albedo");
-        if (albedo_it == v.MemberEnd())
-            return std::nullopt;
-
         auto smooth_shading_it = v.FindMember("smooth_shading");
         if (smooth_shading_it == v.MemberEnd() || !smooth_shading_it->value.IsBool())
-            return std::nullopt;
-
-        std::optional<Color> albedo = get_vector_from_value(albedo_it->value);
-        if (!albedo)
             return std::nullopt;
 
         std::optional<MaterialType> type = get_material_type_from_value(type_it->value);
         if (type == std::nullopt)
             return std::nullopt;
 
-        materials.emplace_back(*type, std::move(*albedo), smooth_shading_it->value.GetBool());
+        float ior = 1.0f;
+
+        Color albedo;
+        if (type != MaterialType::Refractive) {
+            auto albedo_it = v.FindMember("albedo");
+            if (albedo_it == v.MemberEnd())
+                return std::nullopt;
+
+            std::optional<Color> albedo_opt = get_vector_from_value(albedo_it->value);
+            if (!albedo_opt)
+                return std::nullopt;
+            albedo = std::move(*albedo_opt);
+        } else {
+            auto ior_it = v.FindMember("ior");
+            // HACK: The `11-01-refractive/scene0.crtscene` scene has an unused refractive material with an albedo, instead of an IOR.
+            //       I believe that to be an error in the file itself and I think IOR should be required for refractive materials.
+            //       This is done to support lodading the official file, but it may be removed in the future.
+            if (ior_it != v.MemberEnd()) {
+                if (!ior_it->value.IsNumber())
+                    return std::nullopt;
+                ior = ior_it->value.GetFloat();
+            }
+        }
+
+        materials.emplace_back(*type, std::move(albedo), ior, smooth_shading_it->value.GetBool());
     }
 
     return materials;
