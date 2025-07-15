@@ -11,6 +11,7 @@
 #include "crt_mesh.h"
 #include "crt_ray.h"
 #include "crt_scene.h"
+#include "crt_texture.h"
 #include "crt_triangle.h"
 #include "crt_camera.h"
 #include "crt_image.h"
@@ -127,6 +128,7 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene) {
 
     if (auto intersection = trace_ray(ray, scene)) {
         const crt::Material &material = scene.materials[intersection->material_index];
+        const crt::Texture &albedo_map = scene.textures.find(material.albedo_map_texture_name)->second;
         crt::Vector normal = intersection->normal(material);
 
         switch (material.type) {
@@ -146,7 +148,7 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene) {
                     auto shadow_intersection = trace_ray_with_refractions(shadow_ray, scene, REFRACTION_BIAS);
                     bool is_illuminated = !shadow_intersection.has_value() || shadow_intersection->distance * shadow_intersection->distance > sphere_radius_squared;
                     if (is_illuminated) {
-                        final_color += material.albedo * light.intensity / sphere_area * cos_law;
+                        final_color += albedo_map.sample(0.0f, 0.0f) * light.intensity / sphere_area * cos_law;
                     }
                 }
 
@@ -154,7 +156,7 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene) {
             }
 
             case crt::MaterialType::Reflective: {
-                return material.albedo * shade_ray(ray.reflected_at(intersection->point, normal, REFLECTION_BIAS), scene);
+                return albedo_map.sample(0.0f, 0.0f) * shade_ray(ray.reflected_at(intersection->point, normal, REFLECTION_BIAS), scene);
             }
 
             case crt::MaterialType::Refractive: {
@@ -183,7 +185,7 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene) {
             }
 
             case crt::MaterialType::Constant: {
-                return material.albedo;
+                return albedo_map.sample(0.0f, 0.0f);
             }
 
             default:
@@ -225,7 +227,7 @@ static crt::Image render_image(const crt::Scene &scene) {
 }
 
 int main(int argc, char *argv[]) {
-    auto input_file_path = argc > 1 ? argv[1] : "../scenes/11-01-refractive/scene1.crtscene";
+    auto input_file_path = argc > 1 ? argv[1] : "../scenes/12-01-textures/scene0.crtscene";
 
     std::ifstream input_file{ input_file_path, std::ios::in | std::ios::binary };
     if (!input_file.is_open()) {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "crt_image.h"
+#include <string>
 
 namespace crt {
 
@@ -13,7 +13,7 @@ enum class MaterialType {
 
 struct Material {
     MaterialType type;
-    Color albedo;
+    std::string albedo_map_texture_name;
     float ior;
     bool smooth_shading;
 };

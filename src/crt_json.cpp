@@ -2,9 +2,12 @@
 
 #include <cassert>
 #include <optional>
+#include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "crt_texture.h"
 #include "rapidjson/document.h"
 #include "rapidjson/istreamwrapper.h"
 #include "rapidjson/rapidjson.h"
@@ -194,19 +197,100 @@ static std::optional<std::vector<Light>> get_lights_from_value(const rapidjson::
     return lights;
 }
 
-static std::optional<MaterialType> get_material_type_from_value(const rapidjson::Value &string_value) {
-    assert(string_value.IsString());
-
-    if (string_value == "diffuse")
+static std::optional<MaterialType> get_material_type_from_value(const rapidjson::Value &value) {
+    if (value == "diffuse")
         return MaterialType::Diffuse;
-    if (string_value == "reflective")
+    if (value == "reflective")
         return MaterialType::Reflective;
-    if (string_value == "refractive")
+    if (value == "refractive")
         return MaterialType::Refractive;
-    if (string_value == "constant")
+    if (value == "constant")
         return MaterialType::Constant;
 
     return std::nullopt;
+}
+
+static std::optional<TextureType> get_texture_type_from_value(const rapidjson::Value &value) {
+    if (value == "albedo")
+        return TextureType::Albedo;
+
+    return std::nullopt;
+}
+
+static std::optional<AlbedoTexture> get_albedo_texture_from_value(const rapidjson::Value &value) {
+    assert(value.IsObject());
+
+    auto albedo_it = value.FindMember("albedo");
+    if (albedo_it == value.MemberEnd())
+        return std::nullopt;
+
+    std::optional<Color> albedo_opt = get_vector_from_value(albedo_it->value);
+    if (!albedo_opt)
+        return std::nullopt;
+    
+    return AlbedoTexture { std::move(*albedo_opt) };
+}
+
+static std::optional<std::unordered_map<std::string, Texture>> get_textures_from_value(const rapidjson::Value &value) {
+    if (!value.IsArray())
+        return std::nullopt;
+
+    std::unordered_map<std::string, Texture> textures;
+    textures.reserve(value.Size());
+
+    for (const auto &v : value.GetArray()) {
+        if (!v.IsObject())
+            return std::nullopt;
+
+        auto name_it = v.FindMember("name");
+        if (name_it == v.MemberEnd() || !name_it->value.IsString())
+            return std::nullopt;
+
+        std::string name{ name_it->value.GetString(), name_it->value.GetStringLength() };
+
+        auto type_it = v.FindMember("type");
+        if (type_it == v.MemberEnd())
+            return std::nullopt;
+
+        std::optional<TextureType> type = get_texture_type_from_value(type_it->value);
+        if (!type) {
+            // TODO: handle invalid types as errors
+            textures.insert(
+                std::make_pair(
+                    std::move(name),
+                    Texture {
+                        .type = TextureType::Albedo,
+                        .as_albedo_tex = AlbedoTexture {
+                            .albedo = Color { 1.0f, 0.0f, 1.0f },
+                        },
+                    }
+                )
+            );
+            continue;
+        }
+
+        switch (*type) {
+            case crt::TextureType::Albedo: {
+                std::optional<AlbedoTexture> albedo_texture = get_albedo_texture_from_value(v);
+                if (!albedo_texture)
+                    return std::nullopt;
+
+                textures.insert(
+                    std::make_pair(
+                        std::move(name),
+                        Texture { .type = *type, .as_albedo_tex = std::move(*albedo_texture) }
+                    )
+                );
+                continue;
+            }
+
+            default:
+                // std::unreachable() // FIXME: Use C++23 maybe?
+                assert(false);
+        }
+    }
+
+    return textures;
 }
 
 static std::optional<std::vector<Material>> get_materials_from_value(const rapidjson::Value &value) {
@@ -221,7 +305,7 @@ static std::optional<std::vector<Material>> get_materials_from_value(const rapid
             return std::nullopt;
 
         auto type_it = v.FindMember("type");
-        if (type_it == v.MemberEnd() || !type_it->value.IsString())
+        if (type_it == v.MemberEnd())
             return std::nullopt;
 
         auto smooth_shading_it = v.FindMember("smooth_shading");
@@ -229,21 +313,20 @@ static std::optional<std::vector<Material>> get_materials_from_value(const rapid
             return std::nullopt;
 
         std::optional<MaterialType> type = get_material_type_from_value(type_it->value);
-        if (type == std::nullopt)
+        if (!type)
             return std::nullopt;
 
         float ior = 1.0f;
 
-        Color albedo;
+        std::string albedo_texture_name;
         if (type != MaterialType::Refractive) {
             auto albedo_it = v.FindMember("albedo");
-            if (albedo_it == v.MemberEnd())
+            if (albedo_it == v.MemberEnd() || !albedo_it->value.IsString())
                 return std::nullopt;
+            
+            albedo_texture_name = std::string { albedo_it->value.GetString(), albedo_it->value.GetStringLength() };
 
-            std::optional<Color> albedo_opt = get_vector_from_value(albedo_it->value);
-            if (!albedo_opt)
-                return std::nullopt;
-            albedo = std::move(*albedo_opt);
+            // TODO: validate that texture with this name exists
         } else {
             auto ior_it = v.FindMember("ior");
             // HACK: The `11-01-refractive/scene0.crtscene` scene has an unused refractive material with an albedo, instead of an IOR.
@@ -256,7 +339,7 @@ static std::optional<std::vector<Material>> get_materials_from_value(const rapid
             }
         }
 
-        materials.emplace_back(*type, std::move(albedo), ior, smooth_shading_it->value.GetBool());
+        materials.emplace_back(*type, std::move(albedo_texture_name), ior, smooth_shading_it->value.GetBool());
     }
 
     return materials;
@@ -311,11 +394,26 @@ std::optional<Scene> get_scene_from_istream(std::istream &is) {
     if (materials_it == doc.MemberEnd())
         return std::nullopt;
 
+    auto textures_it = doc.FindMember("textures");
+    if (textures_it == doc.MemberEnd())
+        return std::nullopt;
+
+    std::optional<std::unordered_map<std::string, Texture>> textures = get_textures_from_value(textures_it->value);
+    if (!textures)
+        return std::nullopt;
+
     std::optional<std::vector<Material>> materials = get_materials_from_value(materials_it->value);
     if (!materials)
         return std::nullopt;
 
-    return Scene { std::move(*bg_color), std::move(*camera), std::move(*meshes), std::move(*lights), std::move(*materials) };
+    return Scene {
+        .background_color = std::move(*bg_color),
+        .camera = std::move(*camera),
+        .textures = std::move(*textures),
+        .meshes = std::move(*meshes),
+        .lights = std::move(*lights),
+        .materials = std::move(*materials)
+    };
 }
 
 }
