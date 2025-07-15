@@ -11,7 +11,7 @@
 namespace crt {
 
 struct Mesh {
-    Mesh(std::span<const Vector> positions, std::span<const int> indices, int material_index);
+    Mesh(std::span<const Vector> positions, std::span<const Vector> uvs, std::span<const int> indices, int material_index);
 
     std::vector<Vertex> vertices;
     std::vector<Triangle> triangles;

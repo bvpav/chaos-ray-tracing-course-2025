@@ -1,6 +1,7 @@
 #pragma once
 
 #include "crt_image.h"
+#include "crt_vector.h"
 
 namespace crt {
     
@@ -17,7 +18,7 @@ struct EdgesTexture {
     Color edge_color, inner_color;
     float edge_width;
 };
-    
+
 struct Texture {
     TextureType type;
 
@@ -26,7 +27,7 @@ struct Texture {
         EdgesTexture as_edges_tex;
     };
 
-    const Color &sample(float u, float v, float bary_u, float bary_v) const;
+    const Color &sample(Vector uv, float bary_u, float bary_v) const;
 };
     
 }

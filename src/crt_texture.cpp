@@ -3,7 +3,7 @@
 
 namespace crt {
 
-const Color &Texture::sample(float u, float v, float bary_u, float bary_v) const {
+const Color &Texture::sample(Vector uv, float bary_u, float bary_v) const {
     switch (type) {
         case TextureType::Albedo:
             return as_albedo_tex.albedo;
@@ -16,7 +16,6 @@ const Color &Texture::sample(float u, float v, float bary_u, float bary_v) const
                 return et.edge_color;
             else 
                 return et.inner_color;
-            
         }
     }
 

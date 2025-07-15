@@ -146,6 +146,10 @@ static std::optional<std::vector<Mesh>> get_meshes_from_value(const rapidjson::V
         if (vertices_it == v.MemberEnd())
             return std::nullopt;
 
+        auto uvs_it = v.FindMember("uvs");
+        if (uvs_it == v.MemberEnd())
+            return std::nullopt;
+
         auto indices_it = v.FindMember("triangles");
         if (indices_it == v.MemberEnd())
             return std::nullopt;
@@ -158,11 +162,15 @@ static std::optional<std::vector<Mesh>> get_meshes_from_value(const rapidjson::V
         if (!vertices)
             return std::nullopt;
 
+        std::optional<std::vector<Vector>> uvs = get_vector_array_from_value(uvs_it->value);
+        if (!uvs)
+            return std::nullopt;
+
         std::optional<std::vector<int>> indices = get_int_array_from_value(indices_it->value);
         if (!indices)
             return std::nullopt;
 
-        meshes.emplace_back(std::move(*vertices), std::move(*indices), material_index_it->value.GetInt());
+        meshes.emplace_back(std::move(*vertices), std::move(*uvs), std::move(*indices), material_index_it->value.GetInt());
     }
 
     return meshes;

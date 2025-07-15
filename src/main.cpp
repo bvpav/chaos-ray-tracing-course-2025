@@ -36,6 +36,7 @@ struct Intersection {
     // NOTE: both normals are stored in the intersection record, because smooth
     //       shading is a property of the material and it's used in the shading stage.
     crt::Vector flat_normal, smooth_normal;
+    crt::Vector uv;
     float bary_u, bary_v;
     int material_index;
 
@@ -74,12 +75,15 @@ static std::optional<Intersection> ray_intersect_triangle(const crt::Ray &ray, c
         const crt::Vector flat_normal = triangle.normal();
         const crt::Vector smooth_normal = v1.normal * bary_u + v2.normal * bary_v + v0.normal * (1 - bary_u - bary_v);
 
+        const crt::Vector uv = v0.uv * bary_u + v1.uv * bary_v + v2.uv * (1.0f - bary_u - bary_v);
+
         return Intersection {
-            intersection_distance,
-            intersection_point,
-            flat_normal, smooth_normal,
-            bary_u, bary_v,
-            -1
+            .distance = intersection_distance,
+            .point = intersection_point,
+            .flat_normal = flat_normal, .smooth_normal = smooth_normal,
+            .uv = uv,
+            .bary_u = bary_u, .bary_v = bary_v,
+            .material_index = -1
         };
     }
 
@@ -148,7 +152,7 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene) {
                     auto shadow_intersection = trace_ray_with_refractions(shadow_ray, scene, REFRACTION_BIAS);
                     bool is_illuminated = !shadow_intersection.has_value() || shadow_intersection->distance * shadow_intersection->distance > sphere_radius_squared;
                     if (is_illuminated) {
-                        final_color += albedo_map.sample(0.0f, 0.0f, intersection->bary_u, intersection->bary_v) * light.intensity / sphere_area * cos_law;
+                        final_color += albedo_map.sample(intersection->uv, intersection->bary_u, intersection->bary_v) * light.intensity / sphere_area * cos_law;
                     }
                 }
 
@@ -156,7 +160,7 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene) {
             }
 
             case crt::MaterialType::Reflective: {
-                return albedo_map.sample(0.0f, 0.0f, intersection->bary_u, intersection->bary_v) * shade_ray(ray.reflected_at(intersection->point, normal, REFLECTION_BIAS), scene);
+                return albedo_map.sample(intersection->uv, intersection->bary_u, intersection->bary_v) * shade_ray(ray.reflected_at(intersection->point, normal, REFLECTION_BIAS), scene);
             }
 
             case crt::MaterialType::Refractive: {
@@ -185,7 +189,7 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene) {
             }
 
             case crt::MaterialType::Constant: {
-                return albedo_map.sample(0.0f, 0.0f, intersection->bary_u, intersection->bary_v);
+                return albedo_map.sample(intersection->uv, intersection->bary_u, intersection->bary_v);
             }
         }
         // std::unreachable() // FIXME: Use C++23 maybe?
@@ -225,7 +229,7 @@ static crt::Image render_image(const crt::Scene &scene) {
 }
 
 int main(int argc, char *argv[]) {
-    auto input_file_path = argc > 1 ? argv[1] : "../scenes/12-01-textures/scene1.crtscene";
+    auto input_file_path = argc > 1 ? argv[1] : "../scenes/12-01-textures/scene2.crtscene";
 
     std::ifstream input_file{ input_file_path, std::ios::in | std::ios::binary };
     if (!input_file.is_open()) {

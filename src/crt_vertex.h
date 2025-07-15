@@ -7,6 +7,7 @@ namespace crt {
 struct Vertex {
     Vector position{};
     Vector normal{};
+    Vector uv{};
 };
 
 
