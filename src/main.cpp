@@ -75,7 +75,7 @@ static std::optional<Intersection> ray_intersect_triangle(const crt::Ray &ray, c
         const crt::Vector flat_normal = triangle.normal();
         const crt::Vector smooth_normal = v1.normal * bary_u + v2.normal * bary_v + v0.normal * (1 - bary_u - bary_v);
 
-        const crt::Vector uv = v0.uv * bary_u + v1.uv * bary_v + v2.uv * (1.0f - bary_u - bary_v);
+        const crt::Vector uv = v1.uv * bary_u + v2.uv * bary_v + v0.uv * (1.0f - bary_u - bary_v);
 
         return Intersection {
             .distance = intersection_distance,

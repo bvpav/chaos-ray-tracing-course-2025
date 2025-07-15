@@ -223,6 +223,8 @@ static std::optional<TextureType> get_texture_type_from_value(const rapidjson::V
         return TextureType::Albedo;
     if (value == "edges")
         return TextureType::Edges;
+    if (value == "checker")
+        return TextureType::Checker;
 
     return std::nullopt;
 }
@@ -264,7 +266,41 @@ static std::optional<EdgesTexture> get_edges_texture_from_value(const rapidjson:
     if (!inner_color)
         return std::nullopt;
     
-    return EdgesTexture { std::move(*edge_color), std::move(*inner_color), edge_width_it->value.GetFloat() };
+    return EdgesTexture {
+        .edge_color = std::move(*edge_color),
+        .inner_color = std::move(*inner_color),
+        .edge_width = edge_width_it->value.GetFloat()
+    };
+}
+
+static std::optional<CheckerTexture> get_checker_texture_from_value(const rapidjson::Value &value) {
+    assert(value.IsObject());
+
+    auto color_a_it = value.FindMember("color_A");
+    if (color_a_it == value.MemberEnd())
+        return std::nullopt;
+
+    auto color_b_it = value.FindMember("color_B");
+    if (color_b_it == value.MemberEnd())
+        return std::nullopt;
+
+    auto square_size_it = value.FindMember("square_size");
+    if (square_size_it == value.MemberEnd() || !square_size_it->value.IsNumber())
+        return std::nullopt;
+
+    std::optional<Color> color_a = get_vector_from_value(color_a_it->value);
+    if (!color_a)
+        return std::nullopt;
+
+    std::optional<Color> color_b = get_vector_from_value(color_b_it->value);
+    if (!color_b)
+        return std::nullopt;
+    
+    return CheckerTexture {
+        .color_a = std::move(*color_a),
+        .color_b = std::move(*color_b),
+        .square_size = square_size_it->value.GetFloat(),
+    };
 }
 
 static std::optional<std::unordered_map<std::string, Texture>> get_textures_from_value(const rapidjson::Value &value) {
@@ -329,6 +365,20 @@ static std::optional<std::unordered_map<std::string, Texture>> get_textures_from
                     std::make_pair(
                         std::move(name),
                         Texture { .type = *type, .as_edges_tex = std::move(*edges_texture) }
+                    )
+                );
+                continue;
+            }
+
+            case TextureType::Checker: {
+                std::optional<CheckerTexture> checker_texture = get_checker_texture_from_value(v);
+                if (!checker_texture)
+                    return std::nullopt;
+
+                textures.insert(
+                    std::make_pair(
+                        std::move(name),
+                        Texture { .type = *type, .as_checker_tex = std::move(*checker_texture) }
                     )
                 );
                 continue;
