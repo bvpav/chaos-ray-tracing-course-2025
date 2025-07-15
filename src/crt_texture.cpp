@@ -1,5 +1,6 @@
 #include "crt_texture.h"
 #include <cassert>
+#include <cmath>
 
 namespace crt {
 
@@ -21,15 +22,15 @@ const Color &Texture::sample(const Vector &uv, float bary_u, float bary_v) const
         case TextureType::Checker: {
             const CheckerTexture &ct = as_checker_tex;
 
-            float u, v;
-            for (u = uv.x; u > 2.0f * ct.square_size; u -= 2.0f * ct.square_size);
-            for (v = uv.y; v > 2.0f * ct.square_size; v -= 2.0f * ct.square_size);
+            // NOTE: This can be optimized further by storing the recirpical of square_size.
+            //       It's currently not done to avoid premature optimization...
+            int row = static_cast<int>(uv.x / ct.square_size);
+            int col = static_cast<int>(uv.y / ct.square_size);
 
-            if (u <= ct.square_size && v <= ct.square_size
-                    || u >= ct.square_size && v >= ct.square_size)
-                return ct.color_a;
-            else
+            if ((row + col) & 1)
                 return ct.color_b;
+            else
+                return ct.color_a;
         }
     }
 
