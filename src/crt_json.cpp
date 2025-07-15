@@ -213,6 +213,8 @@ static std::optional<MaterialType> get_material_type_from_value(const rapidjson:
 static std::optional<TextureType> get_texture_type_from_value(const rapidjson::Value &value) {
     if (value == "albedo")
         return TextureType::Albedo;
+    if (value == "edges")
+        return TextureType::Edges;
 
     return std::nullopt;
 }
@@ -229,6 +231,32 @@ static std::optional<AlbedoTexture> get_albedo_texture_from_value(const rapidjso
         return std::nullopt;
     
     return AlbedoTexture { std::move(*albedo_opt) };
+}
+
+static std::optional<EdgesTexture> get_edges_texture_from_value(const rapidjson::Value &value) {
+    assert(value.IsObject());
+
+    auto edge_width_it = value.FindMember("edge_width");
+    if (edge_width_it == value.MemberEnd() || !edge_width_it->value.IsNumber())
+        return std::nullopt;
+
+    auto edge_color_it = value.FindMember("edge_color");
+    if (edge_color_it == value.MemberEnd())
+        return std::nullopt;
+
+    std::optional<Color> edge_color = get_vector_from_value(edge_color_it->value);
+    if (!edge_color)
+        return std::nullopt;
+    
+    auto inner_color_it = value.FindMember("inner_color");
+    if (inner_color_it == value.MemberEnd())
+        return std::nullopt;
+
+    std::optional<Color> inner_color = get_vector_from_value(inner_color_it->value);
+    if (!inner_color)
+        return std::nullopt;
+    
+    return EdgesTexture { std::move(*edge_color), std::move(*inner_color), edge_width_it->value.GetFloat() };
 }
 
 static std::optional<std::unordered_map<std::string, Texture>> get_textures_from_value(const rapidjson::Value &value) {
@@ -270,7 +298,7 @@ static std::optional<std::unordered_map<std::string, Texture>> get_textures_from
         }
 
         switch (*type) {
-            case crt::TextureType::Albedo: {
+            case TextureType::Albedo: {
                 std::optional<AlbedoTexture> albedo_texture = get_albedo_texture_from_value(v);
                 if (!albedo_texture)
                     return std::nullopt;
@@ -284,10 +312,22 @@ static std::optional<std::unordered_map<std::string, Texture>> get_textures_from
                 continue;
             }
 
-            default:
-                // std::unreachable() // FIXME: Use C++23 maybe?
-                assert(false);
+            case TextureType::Edges: {
+                std::optional<EdgesTexture> edges_texture = get_edges_texture_from_value(v);
+                if (!edges_texture)
+                    return std::nullopt;
+
+                textures.insert(
+                    std::make_pair(
+                        std::move(name),
+                        Texture { .type = *type, .as_edges_tex = std::move(*edges_texture) }
+                    )
+                );
+                continue;
+            }
         }
+        // std::unreachable() // FIXME: Use C++23 maybe?
+        assert(false);
     }
 
     return textures;
