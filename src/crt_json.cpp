@@ -7,18 +7,18 @@
 #include <utility>
 #include <vector>
 
-#include "crt_texture.h"
 #include "rapidjson/document.h"
 #include "rapidjson/istreamwrapper.h"
 #include "rapidjson/rapidjson.h"
 
-#include "crt_light.h"
-#include "crt_material.h"
 #include "crt_camera.h"
 #include "crt_image.h"
+#include "crt_light.h"
+#include "crt_material.h"
 #include "crt_matrix.h"
 #include "crt_mesh.h"
 #include "crt_scene.h"
+#include "crt_texture.h"
 #include "crt_transform.h"
 #include "crt_vector.h"
 
