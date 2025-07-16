@@ -6,6 +6,7 @@
 #include <thread>
 #include <cmath>
 
+#include "crt_image_ppm.h"
 #include "crt_json.h"
 #include "crt_material.h"
 #include "crt_mesh.h"
@@ -237,7 +238,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    std::optional<crt::Scene> scene = crt::json::get_scene_from_istream(input_file);
+    std::optional<crt::Scene> scene = crt::json::read_scene_from_istream(input_file);
     if (!scene) {
         std::cerr << "Error: Could not parse JSON file: " << input_file_path << '\n';
         return 1;
@@ -250,7 +251,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    output_file << render_image(*scene).to_ppm(MAX_COLOR_COMPONENT);
+    crt::Image image = render_image(*scene);
+    crt::write_ppm(image, output_file);
 
     return 0;
 }

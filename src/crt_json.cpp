@@ -443,7 +443,7 @@ static std::optional<std::vector<Material>> get_materials_from_value(const rapid
     return materials;
 }
 
-std::optional<Scene> get_scene_from_istream(std::istream &is) {
+std::optional<Scene> read_scene_from_istream(std::istream &is) {
     rapidjson::IStreamWrapper isw{is};
     rapidjson::Document doc;
     if (doc.ParseStream(isw).HasParseError())
