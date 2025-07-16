@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <istream>
 #include <optional>
 
@@ -7,6 +8,6 @@
 
 namespace crt::json {
 
-std::optional<Scene> read_scene_from_istream(std::istream &is);
+std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesystem::path &path);
 
 }

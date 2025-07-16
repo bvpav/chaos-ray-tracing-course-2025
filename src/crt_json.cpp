@@ -1,6 +1,7 @@
 #include "crt_json.h"
 
 #include <cassert>
+#include <new>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -13,6 +14,7 @@
 
 #include "crt_camera.h"
 #include "crt_image.h"
+#include "crt_image_stbi.h"
 #include "crt_light.h"
 #include "crt_material.h"
 #include "crt_matrix.h"
@@ -225,6 +227,8 @@ static std::optional<TextureType> get_texture_type_from_value(const rapidjson::V
         return TextureType::Edges;
     if (value == "checker")
         return TextureType::Checker;
+    if (value == "bitmap")
+        return TextureType::Bitmap;
 
     return std::nullopt;
 }
@@ -303,7 +307,28 @@ static std::optional<CheckerTexture> get_checker_texture_from_value(const rapidj
     };
 }
 
-static std::optional<std::unordered_map<std::string, Texture>> get_textures_from_value(const rapidjson::Value &value) {
+static std::optional<BitmapTexture> get_bitmap_texture_from_value(const rapidjson::Value &value, const std::filesystem::path &asset_root) {
+    assert(value.IsObject());
+
+    namespace fs = std::filesystem;
+
+    auto file_path_it = value.FindMember("file_path");
+    if (file_path_it == value.MemberEnd() || !file_path_it->value.IsString())
+        return std::nullopt;
+
+    fs::path file_path{ std::u8string {  file_path_it->value.GetString(), file_path_it->value.GetString() + file_path_it->value.GetStringLength()  } };
+
+    std::optional<Image> image = read_stb(asset_root / file_path.relative_path());
+    if (!image)
+        return std::nullopt;
+
+    return BitmapTexture {
+        // FIXME: Do not do this...
+        .image = new Image { std::move(*image) },
+    };
+}
+
+static std::optional<std::unordered_map<std::string, Texture>> get_textures_from_value(const rapidjson::Value &value, const std::filesystem::path &asset_root) {
     if (!value.IsArray())
         return std::nullopt;
 
@@ -325,21 +350,8 @@ static std::optional<std::unordered_map<std::string, Texture>> get_textures_from
             return std::nullopt;
 
         std::optional<TextureType> type = get_texture_type_from_value(type_it->value);
-        if (!type) {
-            // TODO: handle invalid types as errors
-            textures.insert(
-                std::make_pair(
-                    std::move(name),
-                    Texture {
-                        .type = TextureType::Albedo,
-                        .as_albedo_tex = AlbedoTexture {
-                            .albedo = Color { 1.0f, 0.0f, 1.0f },
-                        },
-                    }
-                )
-            );
-            continue;
-        }
+        if (!type)
+            return std::nullopt;
 
         switch (*type) {
             case TextureType::Albedo: {
@@ -379,6 +391,20 @@ static std::optional<std::unordered_map<std::string, Texture>> get_textures_from
                     std::make_pair(
                         std::move(name),
                         Texture { .type = *type, .as_checker_tex = std::move(*checker_texture) }
+                    )
+                );
+                continue;
+            }
+
+            case crt::TextureType::Bitmap: {
+                std::optional<BitmapTexture> bitmap_texture = get_bitmap_texture_from_value(v, asset_root);
+                if (!bitmap_texture)
+                    return std::nullopt;
+
+                textures.insert(
+                    std::make_pair(
+                        std::move(name),
+                        Texture { .type = *type, .as_bitmap_tex = std::move(*bitmap_texture) }
                     )
                 );
                 continue;
@@ -443,7 +469,7 @@ static std::optional<std::vector<Material>> get_materials_from_value(const rapid
     return materials;
 }
 
-std::optional<Scene> read_scene_from_istream(std::istream &is) {
+std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesystem::path &asset_root) {
     rapidjson::IStreamWrapper isw{is};
     rapidjson::Document doc;
     if (doc.ParseStream(isw).HasParseError())
@@ -496,7 +522,7 @@ std::optional<Scene> read_scene_from_istream(std::istream &is) {
     if (textures_it == doc.MemberEnd())
         return std::nullopt;
 
-    std::optional<std::unordered_map<std::string, Texture>> textures = get_textures_from_value(textures_it->value);
+    std::optional<std::unordered_map<std::string, Texture>> textures = get_textures_from_value(textures_it->value, asset_root);
     if (!textures)
         return std::nullopt;
 

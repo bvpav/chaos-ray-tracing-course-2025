@@ -220,7 +220,7 @@ static crt::Image render_image(const crt::Scene &scene) {
             for (int raster_y = start_row; raster_y < end_row; ++raster_y) {
                 for (int raster_x = 0; raster_x < scene.camera.resolution_x(); ++raster_x) {
                     crt::Ray camera_ray = scene.camera.generate_ray(raster_x, raster_y);
-                    result.pixels[raster_y * result.width + raster_x] = shade_ray(camera_ray, scene);
+                    result.buffer[raster_y * result.width + raster_x] = shade_ray(camera_ray, scene);
                 }
             }
         });
@@ -230,7 +230,7 @@ static crt::Image render_image(const crt::Scene &scene) {
 }
 
 int main(int argc, char *argv[]) {
-    auto input_file_path = argc > 1 ? argv[1] : "../scenes/12-01-textures/scene2.crtscene";
+    std::filesystem::path input_file_path = argc > 1 ? argv[1] : "../scenes/12-01-textures/scene3.crtscene";
 
     std::ifstream input_file{ input_file_path, std::ios::in | std::ios::binary };
     if (!input_file.is_open()) {
@@ -238,7 +238,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    std::optional<crt::Scene> scene = crt::json::read_scene_from_istream(input_file);
+    std::optional<crt::Scene> scene = crt::json::read_scene_from_istream(input_file, input_file_path.parent_path());
     if (!scene) {
         std::cerr << "Error: Could not parse JSON file: " << input_file_path << '\n';
         return 1;

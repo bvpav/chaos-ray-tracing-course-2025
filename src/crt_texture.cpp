@@ -32,6 +32,15 @@ const Color &Texture::sample(const Vector &uv, float bary_u, float bary_v) const
             else
                 return ct.color_a;
         }
+
+        case TextureType::Bitmap: {
+            const Image &bti = *as_bitmap_tex.image;
+
+            int raster_x = static_cast<int>(uv.x * bti.width) % bti.width;
+            int raster_y = static_cast<int>((1.0f - uv.y) * bti.height) % bti.height;
+
+            return bti.buffer[raster_y * bti.width + raster_x];
+        }
     }
 
     // std::unreachable() // FIXME: Use C++23 maybe?
