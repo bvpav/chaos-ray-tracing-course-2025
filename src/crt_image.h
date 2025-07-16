@@ -19,10 +19,10 @@ struct Image {
         , buffer(width * height)
     {}
 
-    Image(const int width, const int height, std::span<const Color> pixels)
+    Image(const int width, const int height, std::vector<Color> &&buffer)
         : width(width)
         , height(height)
-        , buffer(pixels.begin(), pixels.end())
+        , buffer(std::move(buffer))
     {
     }
 };
