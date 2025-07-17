@@ -1,7 +1,5 @@
 #pragma once
 
-#include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "crt_camera.h"
@@ -16,7 +14,7 @@ namespace crt {
 struct Scene {
     Color background_color;
     Camera camera;
-    std::unordered_map<std::string, Texture> textures;
+    std::vector<Texture> textures;
     std::vector<Mesh> meshes;
     std::vector<Light> lights;
     std::vector<Material> materials;

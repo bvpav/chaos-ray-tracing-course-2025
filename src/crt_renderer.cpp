@@ -37,7 +37,7 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const 
 
     if (auto intersection = trace_ray(ray, scene)) {
         const crt::Material &material = scene.materials[intersection->material_index];
-        const crt::Texture &albedo_map = scene.textures.find(material.albedo_map_texture_name)->second;
+        const crt::Texture &albedo_map = scene.textures[material.albedo_map_texture_index];
         crt::Vector normal = intersection->normal(material);
 
         switch (material.type) {

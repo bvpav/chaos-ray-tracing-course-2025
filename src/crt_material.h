@@ -13,7 +13,7 @@ enum class MaterialType {
 
 struct Material {
     MaterialType type;
-    std::string albedo_map_texture_name;
+    int albedo_map_texture_index;
     float ior;
     bool smooth_shading;
 };

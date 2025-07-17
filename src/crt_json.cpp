@@ -1,9 +1,11 @@
 #include "crt_json.h"
 
 #include <cassert>
+#include <cstddef>
 #include <new>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -328,14 +330,21 @@ static std::optional<BitmapTexture> get_bitmap_texture_from_value(const rapidjso
     };
 }
 
-static std::optional<std::unordered_map<std::string, Texture>> get_textures_from_value(const rapidjson::Value &value, const std::filesystem::path &asset_root) {
+struct ParsedTextures {
+    std::vector<Texture> textures;
+    std::unordered_map<std::string_view, std::size_t> texture_index_map;
+};
+
+static std::optional<ParsedTextures> get_textures_from_value(const rapidjson::Value &value, const std::filesystem::path &asset_root) {
     if (!value.IsArray())
         return std::nullopt;
 
-    std::unordered_map<std::string, Texture> textures;
-    textures.reserve(value.Size());
+    ParsedTextures result;
+    result.textures.reserve(value.Size());
 
-    for (const auto &v : value.GetArray()) {
+    for (size_t i = 0; i < value.Size(); ++i) {
+        const auto &v = value[i];
+
         if (!v.IsObject())
             return std::nullopt;
 
@@ -343,7 +352,9 @@ static std::optional<std::unordered_map<std::string, Texture>> get_textures_from
         if (name_it == v.MemberEnd() || !name_it->value.IsString())
             return std::nullopt;
 
-        std::string name{ name_it->value.GetString(), name_it->value.GetStringLength() };
+        std::string_view name{ name_it->value.GetString(), name_it->value.GetStringLength() };
+
+        result.texture_index_map[name] = i;
 
         auto type_it = v.FindMember("type");
         if (type_it == v.MemberEnd())
@@ -359,11 +370,8 @@ static std::optional<std::unordered_map<std::string, Texture>> get_textures_from
                 if (!albedo_texture)
                     return std::nullopt;
 
-                textures.insert(
-                    std::make_pair(
-                        std::move(name),
-                        Texture { .type = *type, .as_albedo_tex = std::move(*albedo_texture) }
-                    )
+                result.textures.emplace_back(
+                    Texture { .type = *type, .as_albedo_tex = std::move(*albedo_texture) }
                 );
                 continue;
             }
@@ -373,11 +381,8 @@ static std::optional<std::unordered_map<std::string, Texture>> get_textures_from
                 if (!edges_texture)
                     return std::nullopt;
 
-                textures.insert(
-                    std::make_pair(
-                        std::move(name),
-                        Texture { .type = *type, .as_edges_tex = std::move(*edges_texture) }
-                    )
+                result.textures.emplace_back(
+                    Texture { .type = *type, .as_edges_tex = std::move(*edges_texture) }
                 );
                 continue;
             }
@@ -387,11 +392,8 @@ static std::optional<std::unordered_map<std::string, Texture>> get_textures_from
                 if (!checker_texture)
                     return std::nullopt;
 
-                textures.insert(
-                    std::make_pair(
-                        std::move(name),
-                        Texture { .type = *type, .as_checker_tex = std::move(*checker_texture) }
-                    )
+                result.textures.emplace_back(
+                    Texture { .type = *type, .as_checker_tex = std::move(*checker_texture) }
                 );
                 continue;
             }
@@ -401,11 +403,8 @@ static std::optional<std::unordered_map<std::string, Texture>> get_textures_from
                 if (!bitmap_texture)
                     return std::nullopt;
 
-                textures.insert(
-                    std::make_pair(
-                        std::move(name),
-                        Texture { .type = *type, .as_bitmap_tex = std::move(*bitmap_texture) }
-                    )
+                result.textures.emplace_back(
+                    Texture { .type = *type, .as_bitmap_tex = std::move(*bitmap_texture) }
                 );
                 continue;
             }
@@ -414,10 +413,10 @@ static std::optional<std::unordered_map<std::string, Texture>> get_textures_from
         assert(false);
     }
 
-    return textures;
+    return result;
 }
 
-static std::optional<std::vector<Material>> get_materials_from_value(const rapidjson::Value &value) {
+static std::optional<std::vector<Material>> get_materials_from_value(const rapidjson::Value &value, const std::unordered_map<std::string_view, size_t> &texture_index_map) {
     if (!value.IsArray())
         return std::nullopt;
 
@@ -442,15 +441,19 @@ static std::optional<std::vector<Material>> get_materials_from_value(const rapid
 
         float ior = 1.0f;
 
-        std::string albedo_texture_name;
+        int albedo_map_texture_index = -1;
         if (type != MaterialType::Refractive) {
             auto albedo_it = v.FindMember("albedo");
             if (albedo_it == v.MemberEnd() || !albedo_it->value.IsString())
                 return std::nullopt;
             
-            albedo_texture_name = std::string { albedo_it->value.GetString(), albedo_it->value.GetStringLength() };
+            std::string_view albedo{ albedo_it->value.GetString(), albedo_it->value.GetStringLength() };
 
-            // TODO: validate that texture with this name exists
+            auto albedo_map_texture_index_it = texture_index_map.find(albedo);
+            if (albedo_map_texture_index_it == texture_index_map.end())
+                return std::nullopt;
+
+            albedo_map_texture_index = albedo_map_texture_index_it->second;
         } else {
             auto ior_it = v.FindMember("ior");
             // HACK: The `11-01-refractive/scene0.crtscene` scene has an unused refractive material with an albedo, instead of an IOR.
@@ -463,7 +466,7 @@ static std::optional<std::vector<Material>> get_materials_from_value(const rapid
             }
         }
 
-        materials.emplace_back(*type, std::move(albedo_texture_name), ior, smooth_shading_it->value.GetBool());
+        materials.emplace_back(*type, albedo_map_texture_index, ior, smooth_shading_it->value.GetBool());
     }
 
     return materials;
@@ -522,18 +525,18 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
     if (textures_it == doc.MemberEnd())
         return std::nullopt;
 
-    std::optional<std::unordered_map<std::string, Texture>> textures = get_textures_from_value(textures_it->value, asset_root);
-    if (!textures)
+    std::optional<ParsedTextures> parsed_textures = get_textures_from_value(textures_it->value, asset_root);
+    if (!parsed_textures)
         return std::nullopt;
 
-    std::optional<std::vector<Material>> materials = get_materials_from_value(materials_it->value);
+    std::optional<std::vector<Material>> materials = get_materials_from_value(materials_it->value, parsed_textures->texture_index_map);
     if (!materials)
         return std::nullopt;
 
     return Scene {
         .background_color = std::move(*bg_color),
         .camera = std::move(*camera),
-        .textures = std::move(*textures),
+        .textures = std::move(parsed_textures->textures),
         .meshes = std::move(*meshes),
         .lights = std::move(*lights),
         .materials = std::move(*materials)
