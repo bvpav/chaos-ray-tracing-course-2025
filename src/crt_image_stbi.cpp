@@ -1,3 +1,5 @@
+#include "crt_image_stbi.h"
+
 #include <experimental/scope>
 #include <optional>
 #include <vector>
@@ -5,7 +7,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#include "crt_image_stbi.h"
 #include "crt_image.h"
 
 using std::experimental::scope_exit;

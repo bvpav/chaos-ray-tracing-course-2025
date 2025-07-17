@@ -1,6 +1,7 @@
+#include "crt_image_ppm.h"
+
 #include <algorithm>
 
-#include "crt_image_ppm.h"
 #include "crt_image.h"
 
 namespace crt {
