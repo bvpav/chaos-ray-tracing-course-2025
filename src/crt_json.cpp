@@ -8,9 +8,9 @@
 #include <utility>
 #include <vector>
 
-#include "rapidjson/document.h"
-#include "rapidjson/istreamwrapper.h"
-#include "rapidjson/rapidjson.h"
+#include <rapidjson/document.h>
+#include <rapidjson/istreamwrapper.h>
+#include <rapidjson/rapidjson.h>
 
 #include "crt_camera.h"
 #include "crt_image.h"
@@ -396,7 +396,7 @@ static std::optional<std::unordered_map<std::string, Texture>> get_textures_from
                 continue;
             }
 
-            case crt::TextureType::Bitmap: {
+            case TextureType::Bitmap: {
                 std::optional<BitmapTexture> bitmap_texture = get_bitmap_texture_from_value(v, asset_root);
                 if (!bitmap_texture)
                     return std::nullopt;

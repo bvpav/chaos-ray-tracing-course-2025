@@ -1,9 +1,8 @@
 #pragma once
 
-#include "crt_ray.h"
-#include <mutex>
-#include <ostream>
 #include <vector>
+
+#include "crt_ray.h"
 
 namespace crt {
 

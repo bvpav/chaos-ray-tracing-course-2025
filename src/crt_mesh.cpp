@@ -12,7 +12,7 @@ namespace crt {
         // Create vertices with both position and UV data
         vertices.reserve(positions.size());
         for (size_t i = 0; i < positions.size(); ++i) {
-            vertices.emplace_back(positions[i], Vector{}, uvs[i]);
+            vertices.emplace_back(positions[i], Vector {}, uvs[i]);
         }
 
         // Compute smooth normals of vertices

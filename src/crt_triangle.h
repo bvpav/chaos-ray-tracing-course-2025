@@ -30,11 +30,11 @@ public:
         return edge0.cross(edge1).length() * 0.5;
     }
 
-    std::tuple<const crt::Vertex &, const crt::Vertex &, const crt::Vertex &> vertices() const {
+    std::tuple<const Vertex &, const Vertex &, const Vertex &> vertices() const {
         return { m_v0, m_v1, m_v2 };
     }
 
-    std::tuple<crt::Vector, crt::Vector, crt::Vector> edges() const {
+    std::tuple<Vector, Vector, Vector> edges() const {
         return {
             m_v1.position - m_v0.position,
             m_v2.position - m_v1.position,

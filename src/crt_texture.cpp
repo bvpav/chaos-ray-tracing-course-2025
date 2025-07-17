@@ -1,4 +1,5 @@
 #include "crt_texture.h"
+
 #include <cassert>
 #include <cmath>
 

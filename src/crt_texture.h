@@ -2,7 +2,6 @@
 
 #include "crt_image.h"
 #include "crt_vector.h"
-#include <memory>
 
 namespace crt {
     

@@ -117,7 +117,7 @@ static std::optional<Intersection> trace_ray_with_refractions(const crt::Ray &ra
     while (has_refracted && r.depth <= MAX_RAY_DEPTH) {
         closest_intersection = ray_intersect_mesh_span(ray, scene.meshes);
         if (closest_intersection) {
-            const auto material = scene.materials[closest_intersection->material_index];
+            const crt::Material &material = scene.materials[closest_intersection->material_index];
             has_refracted = material.type == crt::MaterialType::Refractive;
             if (has_refracted) {
                 has_refracted = r.refract_at(closest_intersection->point, closest_intersection->normal(material), material.ior, refraction_bias);
@@ -129,7 +129,7 @@ static std::optional<Intersection> trace_ray_with_refractions(const crt::Ray &ra
 
 static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene) {
     if (ray.depth > MAX_RAY_DEPTH)
-        return crt::Color{ 0.0f, 0.0f, 0.0f };
+        return crt::Color { 0.0f, 0.0f, 0.0f };
 
     if (auto intersection = trace_ray(ray, scene)) {
         const crt::Material &material = scene.materials[intersection->material_index];
@@ -161,7 +161,8 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene) {
             }
 
             case crt::MaterialType::Reflective: {
-                return albedo_map.sample(intersection->uv, intersection->bary_u, intersection->bary_v) * shade_ray(ray.reflected_at(intersection->point, normal, REFLECTION_BIAS), scene);
+                crt::Ray reflection_ray = ray.reflected_at(intersection->point, normal, REFLECTION_BIAS);
+                return albedo_map.sample(intersection->uv, intersection->bary_u, intersection->bary_v) * shade_ray(reflection_ray, scene);
             }
 
             case crt::MaterialType::Refractive: {

@@ -3,7 +3,7 @@
 namespace crt {
 
 Ray Camera::generate_ray(int raster_x, int raster_y) const {
-    crt::Ray ray{};
+    Ray ray{};
 
     // Pixel center in raster space
     ray.direction = { raster_x + 0.5f, raster_y + 0.5f, 0.0f };

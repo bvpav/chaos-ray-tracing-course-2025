@@ -1,7 +1,8 @@
 #pragma once
 
-#include "crt_image.h"
 #include <ostream>
+
+#include "crt_image.h"
 
 namespace crt {
 

@@ -2,7 +2,6 @@
 
 #include "crt_vector.h"
 
-#include <span>
 #include <vector>
 
 namespace crt {
