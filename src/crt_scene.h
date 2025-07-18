@@ -18,6 +18,7 @@ struct Scene {
     std::vector<Mesh> meshes;
     std::vector<Light> lights;
     std::vector<Material> materials;
+    int bucket_size;
 };
 
 }

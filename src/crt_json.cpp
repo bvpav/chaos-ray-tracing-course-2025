@@ -113,19 +113,15 @@ static std::optional<Transform> get_transform_from_value(const rapidjson::Value 
     return Transform { std::move(*location), std::move(*rotation_matrix) };
 }
 
-static std::optional<Camera> get_camera_from_value(const rapidjson::Value &camera_value, const rapidjson::Value &settings_object_value) {
-    assert(settings_object_value.IsObject());
+static std::optional<Camera> get_camera_from_value(const rapidjson::Value &camera_value, const rapidjson::Value &image_settings_object_value) {
+    assert(image_settings_object_value.IsObject());
 
-    auto image_settings_it = settings_object_value.FindMember("image_settings");
-    if (image_settings_it == settings_object_value.MemberEnd())
+    auto width_it = image_settings_object_value.FindMember("width");
+    if (width_it == image_settings_object_value.MemberEnd() || !width_it->value.IsInt())
         return std::nullopt;
 
-    auto width_it = image_settings_it->value.FindMember("width");
-    if (width_it == image_settings_it->value.MemberEnd() || !width_it->value.IsInt())
-        return std::nullopt;
-
-    auto height_it = image_settings_it->value.FindMember("height");
-    if (height_it == image_settings_it->value.MemberEnd() || !height_it->value.IsInt())
+    auto height_it = image_settings_object_value.FindMember("height");
+    if (height_it == image_settings_object_value.MemberEnd() || !height_it->value.IsInt())
         return std::nullopt;
 
     std::optional<Transform> transform = get_transform_from_value(camera_value);
@@ -497,8 +493,16 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
     if (camera_it == doc.MemberEnd())
         return std::nullopt;
 
-    std::optional<Camera> camera = get_camera_from_value(camera_it->value, settings_it->value);
+    auto image_settings_it = settings_it->value.FindMember("image_settings");
+    if (image_settings_it == settings_it->value.MemberEnd())
+        return std::nullopt;
+
+    std::optional<Camera> camera = get_camera_from_value(camera_it->value, image_settings_it->value);
     if (!camera)
+        return std::nullopt;
+
+    auto bucket_size_it = image_settings_it->value.FindMember("bucket_size");
+    if (bucket_size_it == image_settings_it->value.MemberEnd() || !bucket_size_it->value.IsInt())
         return std::nullopt;
 
     auto meshes_it = doc.FindMember("objects");
@@ -539,7 +543,8 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
         .textures = std::move(parsed_textures->textures),
         .meshes = std::move(*meshes),
         .lights = std::move(*lights),
-        .materials = std::move(*materials)
+        .materials = std::move(*materials),
+        .bucket_size = bucket_size_it->value.GetInt()
     };
 }
 
