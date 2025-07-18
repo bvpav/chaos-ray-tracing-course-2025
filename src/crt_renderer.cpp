@@ -2,7 +2,11 @@
 #include "crt_renderer.h"
 
 #include <cmath>
+#include <mutex>
+#include <queue>
 #include <thread>
+#include <tuple>
+#include <utility>
 
 #include "crt_image.h"
 #include "crt_intersection.h"
@@ -118,27 +122,42 @@ void render_region(const Scene &scene, const RendererSettings &settings, int x, 
 Image render_image(const Scene &scene, const RendererSettings &settings) {
     Image result{ scene.camera.resolution_x(), scene.camera.resolution_y() };
 
+    const int bucket_count_x = static_cast<int>(float(result.width) / scene.bucket_size + 0.5);
+    const int bucket_count_y = static_cast<int>(float(result.height) / scene.bucket_size + 0.5);
+
+    std::queue<std::tuple<int, int, int, int>> buckets;
+    for (int bucket_y = 0; bucket_y < bucket_count_y; ++bucket_y) {
+        int y = bucket_y * scene.bucket_size;
+        int height = bucket_y == bucket_count_y - 1 ? result.height - y : scene.bucket_size;
+
+        for (int bucket_x = 0; bucket_x < bucket_count_x; ++bucket_x) {
+            int x = bucket_x * scene.bucket_size;
+            int width = bucket_x == bucket_count_x - 1 ? result.width - x : scene.bucket_size;
+
+            buckets.emplace(std::make_tuple(x, y, width, height));
+        }
+    }
+
+    std::mutex buckets_mutex;
+
     const auto num_threads = std::thread::hardware_concurrency();
     std::vector<std::jthread> threads;
     threads.reserve(num_threads);
 
-    // Split the image in sqrt(num_threads) x sqrt(num_threads) regions
-    const int region_count = static_cast<int>(std::sqrt(num_threads) + 0.5);
-    const int region_width = result.width / region_count;
-    const int region_height = result.height / region_count;
+    for (int i = 0; i < num_threads; ++i) {
+        threads.emplace_back([&]() {
+            for (;;) {
+                std::unique_lock lock(buckets_mutex);
+                if (buckets.empty())
+                    return;
 
-    for (int ry = 0; ry < region_count; ++ry) {
-        const int y = ry * region_height;
-        const int height = ry == region_count - 1 ? result.height - y : region_height;
+                const auto [bucket_x, bucket_y, width, height] = buckets.front();
+                buckets.pop();
+                lock.unlock();
 
-        for (int rx = 0; rx < region_count; ++rx) {
-            const int x = rx * region_width;
-            const int width = rx == region_count - 1 ? result.width - x : region_width;
-
-            threads.emplace_back([&, x, y, width, height]() {
-                render_region(scene, settings, x, y, width, height, result);
-            });
-        }
+                render_region(scene, settings, bucket_x, bucket_y, width, height, result);
+            }
+        });
     }
 
     return result;
