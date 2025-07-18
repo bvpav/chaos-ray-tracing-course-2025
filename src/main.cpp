@@ -1,3 +1,4 @@
+#include <chrono>
 #include <fstream>
 #include <iostream>
 
@@ -18,6 +19,8 @@ constexpr float REFLECTION_BIAS = 1e-2f;
 constexpr float REFRACTION_BIAS = 1e-2f;
 
 int main(int argc, char *argv[]) {
+    using namespace std::chrono;
+
     std::filesystem::path input_file_path = argc > 1 ? argv[1] : "../scenes/13-01-optimizations/scene0-with-textures.crtscene";
 
     std::ifstream input_file{ input_file_path, std::ios::in | std::ios::binary };
@@ -46,7 +49,14 @@ int main(int argc, char *argv[]) {
         .refraction_bias = REFRACTION_BIAS,
     };
 
+    high_resolution_clock::time_point start = high_resolution_clock::now();
     crt::Image image = crt::render_image(*scene, settings);
+    high_resolution_clock::time_point stop = high_resolution_clock::now();
+
+    microseconds duration = duration_cast<microseconds>(stop - start);
+    const long double seconds = duration.count() / 1'000'000.0l;
+    std::cout << "Execution time: " << seconds << " seconds.\n";
+
     crt::write_ppm(image, output_file);
 
     return 0;
