@@ -4,6 +4,7 @@
 #include <cmath>
 #include <thread>
 
+#include "crt_image.h"
 #include "crt_intersection.h"
 
 namespace crt {
@@ -105,6 +106,14 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const 
     }
 }
 
+void render_region(const Scene &scene, const RendererSettings &settings, int x, int y, int width, int height, Image &result) {
+    for (int raster_y = y; raster_y < y + height; ++raster_y) {
+        for (int raster_x = x; raster_x < x + width; ++raster_x) {
+            Ray camera_ray = scene.camera.generate_ray(raster_x, raster_y);
+            result.buffer[raster_y * result.width + raster_x] = shade_ray(camera_ray, scene, settings);
+        }
+    }
+}
 
 Image render_image(const Scene &scene, const RendererSettings &settings) {
     Image result{ scene.camera.resolution_x(), scene.camera.resolution_y() };
@@ -113,23 +122,23 @@ Image render_image(const Scene &scene, const RendererSettings &settings) {
     std::vector<std::jthread> threads;
     threads.reserve(num_threads);
 
-    const auto rows_per_thread = scene.camera.resolution_y() / num_threads;
-    const auto rows_remaining = scene.camera.resolution_y() % num_threads;
-    for (int thread_index = 0; thread_index < num_threads; ++thread_index) {
-        int start_row = thread_index * rows_per_thread;
-        int end_row = start_row + rows_per_thread;
-        if (thread_index == num_threads - 1) {
-            end_row += rows_remaining;
+    // Split the image in sqrt(num_threads) x sqrt(num_threads) regions
+    const int region_count = static_cast<int>(std::sqrt(num_threads) + 0.5);
+    const int region_width = result.width / region_count;
+    const int region_height = result.height / region_count;
+
+    for (int ry = 0; ry < region_count; ++ry) {
+        const int y = ry * region_height;
+        const int height = ry == region_count - 1 ? result.height - y : region_height;
+
+        for (int rx = 0; rx < region_count; ++rx) {
+            const int x = rx * region_width;
+            const int width = rx == region_count - 1 ? result.width - x : region_width;
+
+            threads.emplace_back([&, x, y, width, height]() {
+                render_region(scene, settings, x, y, width, height, result);
+            });
         }
-            
-        threads.emplace_back([&, start_row, end_row]() {
-            for (int raster_y = start_row; raster_y < end_row; ++raster_y) {
-                for (int raster_x = 0; raster_x < scene.camera.resolution_x(); ++raster_x) {
-                    Ray camera_ray = scene.camera.generate_ray(raster_x, raster_y);
-                    result.buffer[raster_y * result.width + raster_x] = shade_ray(camera_ray, scene, settings);
-                }
-            }
-        });
     }
 
     return result;
