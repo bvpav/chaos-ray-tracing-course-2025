@@ -18,7 +18,7 @@ constexpr float REFLECTION_BIAS = 1e-2f;
 constexpr float REFRACTION_BIAS = 1e-2f;
 
 int main(int argc, char *argv[]) {
-    std::filesystem::path input_file_path = argc > 1 ? argv[1] : "../scenes/12-01-textures/scene4.crtscene";
+    std::filesystem::path input_file_path = argc > 1 ? argv[1] : "../scenes/13-01-optimizations/scene0-with-textures.crtscene";
 
     std::ifstream input_file{ input_file_path, std::ios::in | std::ios::binary };
     if (!input_file.is_open()) {
