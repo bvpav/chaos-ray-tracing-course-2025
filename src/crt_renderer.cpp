@@ -110,7 +110,7 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const 
     }
 }
 
-void render_region(const Scene &scene, const RendererSettings &settings, int x, int y, int width, int height, Image &result) {
+static void render_region(const Scene &scene, const RendererSettings &settings, int x, int y, int width, int height, Image &result) {
     for (int raster_y = y; raster_y < y + height; ++raster_y) {
         for (int raster_x = x; raster_x < x + width; ++raster_x) {
             Ray camera_ray = scene.camera.generate_ray(raster_x, raster_y);
@@ -147,15 +147,15 @@ Image render_image(const Scene &scene, const RendererSettings &settings) {
     for (int i = 0; i < num_threads; ++i) {
         threads.emplace_back([&]() {
             for (;;) {
-                std::unique_lock lock(buckets_mutex);
+                std::unique_lock lock{ buckets_mutex };
                 if (buckets.empty())
                     return;
 
-                const auto [bucket_x, bucket_y, width, height] = buckets.front();
+                const auto [x, y, width, height] = buckets.front();
                 buckets.pop();
                 lock.unlock();
 
-                render_region(scene, settings, bucket_x, bucket_y, width, height, result);
+                render_region(scene, settings, x, y, width, height, result);
             }
         });
     }
