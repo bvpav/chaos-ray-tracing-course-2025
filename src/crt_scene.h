@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "crt_aabb.h"
 #include "crt_camera.h"
 #include "crt_image.h"
 #include "crt_light.h"
@@ -15,6 +16,7 @@ struct Scene {
     Color background_color;
     Camera camera;
     std::vector<Texture> textures;
+    AABB bounds;
     std::vector<Mesh> meshes;
     std::vector<Light> lights;
     std::vector<Material> materials;

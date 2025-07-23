@@ -1,5 +1,6 @@
 #pragma once
 
+#include "crt_aabb.h"
 #include "crt_material.h"
 #include "crt_mesh.h"
 #include "crt_ray.h"
@@ -25,6 +26,7 @@ struct Intersection {
 
 namespace intersection {
 
+bool ray_intersect_aabb_p(const Ray &ray, const AABB &aabb);
 std::optional<Intersection> ray_intersect_triangle(const Ray &ray, const Triangle &triangle);
 std::optional<Intersection> ray_intersect_mesh_span(const Ray &ray, std::span<const Mesh> meshes);
 

@@ -2,15 +2,49 @@
 
 #include "crt_ray.h"
 #include "crt_triangle.h"
+#include "crt_vector.h"
 
 namespace crt::intersection {
+
+bool ray_intersect_aabb_p(const Ray &ray, const AABB &aabb) {
+    const Vector *extents = reinterpret_cast<const Vector *>(&aabb);
+
+    for (int extent = 0; extent < 2; ++extent) {
+        for (int side_axis = 0; side_axis < 3; ++side_axis) {
+            bool is_parallel_to_axis = std::abs(ray.direction.data[side_axis]) < 1e-6f;
+            if (is_parallel_to_axis) {
+                continue;
+            }
+
+            const float t = (extents[extent].data[side_axis] - ray.origin.data[side_axis]) / ray.direction.data[side_axis];
+            if (t < 0.0f) {
+                continue;
+            }
+
+            const Vector p = ray.at(t);
+
+            // Check containment in the other 2 axes (u, v)
+            constexpr int u_table[] = { 1, 2, 0 };
+            constexpr int v_table[] = { 2, 0, 1 };
+            const int u = u_table[side_axis], v = v_table[side_axis];
+
+            if (p.data[u] >= aabb.min.data[u] &&
+                    p.data[u] <= aabb.max.data[u] &&
+                    p.data[v] >= aabb.min.data[v] &&
+                    p.data[v] <= aabb.max.data[v]) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 std::optional<Intersection> ray_intersect_triangle(const Ray &ray, const Triangle &triangle) {
     const auto &[v0, v1, v2] = triangle.vertices();
     const auto [e0, e1, e2] = triangle.edges();
 
     float ray_normal_dist = triangle.normal().dot(ray.direction);
-    bool is_parallel_to_plane = std::abs(ray_normal_dist) < 1e-6;
+    bool is_parallel_to_plane = std::abs(ray_normal_dist) < 1e-6f;
     if (is_parallel_to_plane) {
         return std::nullopt;
     }

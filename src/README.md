@@ -4,3 +4,4 @@
 - Thread per row, Release: Execution time: 9.5058 seconds.
 - Thread per region, Release: Execution time: 9.33183 seconds.
 - Thread per bucket, Release: Execution time: 9.24362 seconds.
+- Scene AABB, Release: Execution time: 2.58989 seconds.

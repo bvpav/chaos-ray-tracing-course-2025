@@ -1,7 +1,9 @@
 #include "crt_json.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
+#include <limits>
 #include <new>
 #include <optional>
 #include <string>
@@ -14,6 +16,7 @@
 #include <rapidjson/istreamwrapper.h>
 #include <rapidjson/rapidjson.h>
 
+#include "crt_aabb.h"
 #include "crt_camera.h"
 #include "crt_image.h"
 #include "crt_image_stbi.h"
@@ -131,12 +134,19 @@ static std::optional<Camera> get_camera_from_value(const rapidjson::Value &camer
     return Camera { width_it->value.GetInt(), height_it->value.GetInt(), std::move(*transform) };
 }
 
-static std::optional<std::vector<Mesh>> get_meshes_from_value(const rapidjson::Value &value) {
+struct ParsedMeshes {
+    std::vector<Mesh> meshes;
+    AABB bounds;
+};
+
+static std::optional<ParsedMeshes> get_meshes_from_value(const rapidjson::Value &value) {
     if (!value.IsArray())
         return std::nullopt;
 
-    std::vector<Mesh> meshes;
-    meshes.reserve(value.Size());
+    ParsedMeshes result;
+    result.meshes.reserve(value.Size());
+    result.bounds.min = {  std::numeric_limits<float>::infinity(),  std::numeric_limits<float>::infinity(),  std::numeric_limits<float>::infinity() };
+    result.bounds.max = { -std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity() };
 
     for (const auto &v : value.GetArray()) {
         if (!v.IsObject())
@@ -162,6 +172,16 @@ static std::optional<std::vector<Mesh>> get_meshes_from_value(const rapidjson::V
         if (!vertices)
             return std::nullopt;
 
+        for (const auto &v : *vertices) {
+            result.bounds.min.x = std::min(result.bounds.min.x, v.x);
+            result.bounds.min.y = std::min(result.bounds.min.y, v.y);
+            result.bounds.min.z = std::min(result.bounds.min.z, v.z);
+
+            result.bounds.max.x = std::max(result.bounds.max.x, v.x);
+            result.bounds.max.y = std::max(result.bounds.max.y, v.y);
+            result.bounds.max.z = std::max(result.bounds.max.z, v.z);
+        }
+
         std::optional<std::vector<Vector>> uvs = get_vector_array_from_value(uvs_it->value);
         if (!uvs)
             return std::nullopt;
@@ -170,10 +190,10 @@ static std::optional<std::vector<Mesh>> get_meshes_from_value(const rapidjson::V
         if (!indices)
             return std::nullopt;
 
-        meshes.emplace_back(std::move(*vertices), std::move(*uvs), std::move(*indices), material_index_it->value.GetInt());
+        result.meshes.emplace_back(std::move(*vertices), std::move(*uvs), std::move(*indices), material_index_it->value.GetInt());
     }
 
-    return meshes;
+    return result;
 }
 
 static std::optional<std::vector<Light>> get_lights_from_value(const rapidjson::Value &value) {
@@ -509,8 +529,8 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
     if (meshes_it == doc.MemberEnd())
         return std::nullopt;
 
-    std::optional<std::vector<Mesh>> meshes = get_meshes_from_value(meshes_it->value);
-    if (!meshes)
+    std::optional<ParsedMeshes> parsed_meshes = get_meshes_from_value(meshes_it->value);
+    if (!parsed_meshes)
         return std::nullopt;
 
     auto lights_it = doc.FindMember("lights");
@@ -541,7 +561,8 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
         .background_color = std::move(*bg_color),
         .camera = std::move(*camera),
         .textures = std::move(parsed_textures->textures),
-        .meshes = std::move(*meshes),
+        .bounds = std::move(parsed_meshes->bounds),
+        .meshes = std::move(parsed_meshes->meshes),
         .lights = std::move(*lights),
         .materials = std::move(*materials),
         .bucket_size = bucket_size_it->value.GetInt()
