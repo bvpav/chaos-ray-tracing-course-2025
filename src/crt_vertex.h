@@ -10,5 +10,4 @@ struct Vertex {
     Vector uv{};
 };
 
-
 }

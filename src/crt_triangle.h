@@ -12,8 +12,9 @@ namespace crt {
  */
 class Triangle {
 public:
-    Triangle(const Vertex &v0, const Vertex &v1, const Vertex &v2)
+    Triangle(const Vertex &v0, const Vertex &v1, const Vertex &v2, int material_index)
         : m_v0(v0), m_v1(v1), m_v2(v2)
+        , material_index(material_index)
     {
         Vector edge0 = m_v1.position - m_v0.position;
         Vector edge1 = m_v2.position - m_v0.position;
@@ -41,6 +42,8 @@ public:
             m_v0.position - m_v2.position
         };
     }
+
+    int material_index;
 
 private:
     const Vertex &m_v0, &m_v1, &m_v2;

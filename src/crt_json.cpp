@@ -1,9 +1,7 @@
 #include "crt_json.h"
 
-#include <algorithm>
 #include <cassert>
 #include <cstddef>
-#include <limits>
 #include <new>
 #include <optional>
 #include <string>
@@ -16,7 +14,7 @@
 #include <rapidjson/istreamwrapper.h>
 #include <rapidjson/rapidjson.h>
 
-#include "crt_aabb.h"
+#include "crt_acceleration_tree.h"
 #include "crt_camera.h"
 #include "crt_image.h"
 #include "crt_image_stbi.h"
@@ -27,7 +25,9 @@
 #include "crt_scene.h"
 #include "crt_texture.h"
 #include "crt_transform.h"
+#include "crt_triangle.h"
 #include "crt_vector.h"
+#include "crt_vertex.h"
 
 namespace crt::json {
 
@@ -135,62 +135,73 @@ static std::optional<Camera> get_camera_from_value(const rapidjson::Value &camer
 }
 
 struct ParsedMeshes {
-    std::vector<Mesh> meshes;
-    AABB bounds;
+    std::vector<Vertex> vertices;
+    std::vector<Triangle> triangles;
 };
 
 static std::optional<ParsedMeshes> get_meshes_from_value(const rapidjson::Value &value) {
     if (!value.IsArray())
         return std::nullopt;
 
-    ParsedMeshes result;
-    result.meshes.reserve(value.Size());
-    result.bounds.min = {  std::numeric_limits<float>::infinity(),  std::numeric_limits<float>::infinity(),  std::numeric_limits<float>::infinity() };
-    result.bounds.max = { -std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity() };
+    size_t vertex_count = 0;
+    size_t triangle_count = 0;
 
     for (const auto &v : value.GetArray()) {
         if (!v.IsObject())
             return std::nullopt;
 
-        auto vertices_it = v.FindMember("vertices");
-        if (vertices_it == v.MemberEnd())
+        auto positions_it = v.FindMember("vertices");
+        if (positions_it == v.MemberEnd() || !positions_it->value.IsArray())
             return std::nullopt;
+
+        auto indices_it = v.FindMember("triangles");
+        if (indices_it == v.MemberEnd() || !indices_it->value.IsArray())
+            return std::nullopt;
+
+        if (indices_it->value.Size() % 3 != 0) 
+            return std::nullopt;
+
+        vertex_count += positions_it->value.Size();
+        triangle_count += indices_it->value.Size() / 3;
+    }
+
+    ParsedMeshes result;
+    result.vertices.reserve(vertex_count);
+    result.triangles.reserve(triangle_count);
+
+    for (const auto &v : value.GetArray()) {
+        assert(v.IsObject());
+
+        auto positions_it = v.FindMember("vertices");
+        assert(positions_it != v.MemberEnd());
 
         auto uvs_it = v.FindMember("uvs");
         if (uvs_it == v.MemberEnd())
             return std::nullopt;
 
         auto indices_it = v.FindMember("triangles");
-        if (indices_it == v.MemberEnd())
-            return std::nullopt;
+        assert(indices_it != v.MemberEnd());
 
         auto material_index_it = v.FindMember("material_index");
         if (material_index_it == v.MemberEnd() || !material_index_it->value.IsInt())
             return std::nullopt;
 
-        std::optional<std::vector<Vector>> vertices = get_vector_array_from_value(vertices_it->value);
-        if (!vertices)
+        std::optional<std::vector<Vector>> positions = get_vector_array_from_value(positions_it->value);
+        if (!positions)
             return std::nullopt;
-
-        for (const auto &v : *vertices) {
-            result.bounds.min.x = std::min(result.bounds.min.x, v.x);
-            result.bounds.min.y = std::min(result.bounds.min.y, v.y);
-            result.bounds.min.z = std::min(result.bounds.min.z, v.z);
-
-            result.bounds.max.x = std::max(result.bounds.max.x, v.x);
-            result.bounds.max.y = std::max(result.bounds.max.y, v.y);
-            result.bounds.max.z = std::max(result.bounds.max.z, v.z);
-        }
 
         std::optional<std::vector<Vector>> uvs = get_vector_array_from_value(uvs_it->value);
         if (!uvs)
             return std::nullopt;
 
+        if (uvs->size() != positions->size())
+            return std::nullopt;;
+
         std::optional<std::vector<int>> indices = get_int_array_from_value(indices_it->value);
         if (!indices)
             return std::nullopt;
 
-        result.meshes.emplace_back(std::move(*vertices), std::move(*uvs), std::move(*indices), material_index_it->value.GetInt());
+        vertex_array_extend(result.vertices, result.triangles, *positions, *uvs, *indices, material_index_it->value.GetInt());
     }
 
     return result;
@@ -529,9 +540,11 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
     if (meshes_it == doc.MemberEnd())
         return std::nullopt;
 
-    std::optional<ParsedMeshes> parsed_meshes = get_meshes_from_value(meshes_it->value);
-    if (!parsed_meshes)
+    std::optional<ParsedMeshes> meshes = get_meshes_from_value(meshes_it->value);
+    if (!meshes)
         return std::nullopt;
+
+    AccelerationTree acceleration_tree = acceleration_tree::build(meshes->triangles);
 
     auto lights_it = doc.FindMember("lights");
     if (lights_it == doc.MemberEnd())
@@ -560,10 +573,10 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
     return Scene {
         .background_color = std::move(*bg_color),
         .camera = std::move(*camera),
-        .textures = std::move(parsed_textures->textures),
-        .bounds = std::move(parsed_meshes->bounds),
-        .meshes = std::move(parsed_meshes->meshes),
+        .vertices = std::move(meshes->vertices),
+        .acceleration_tree = std::move(acceleration_tree),
         .lights = std::move(*lights),
+        .textures = std::move(parsed_textures->textures),
         .materials = std::move(*materials),
         .bucket_size = bucket_size_it->value.GetInt()
     };

@@ -1,6 +1,7 @@
 
 #include "crt_renderer.h"
 
+#include <cassert>
 #include <cmath>
 #include <mutex>
 #include <optional>
@@ -17,10 +18,7 @@ namespace crt {
 using namespace intersection;
 
 static std::optional<Intersection> trace_ray(const crt::Ray &ray, const crt::Scene &scene) {
-    if (!ray_intersect_aabb_p(ray, scene.bounds)) 
-        return std::nullopt;
-    
-    return ray_intersect_mesh_span(ray, scene.meshes);
+    return ray_intersect_acceleration_tree(ray, scene.acceleration_tree);
 }
 
 static std::optional<Intersection> trace_ray_with_refractions(const crt::Ray &ray, const crt::Scene &scene, const RendererSettings &settings) {
@@ -28,10 +26,7 @@ static std::optional<Intersection> trace_ray_with_refractions(const crt::Ray &ra
     std::optional<Intersection> closest_intersection = std::nullopt;
     bool has_refracted = false;
     while (has_refracted && r.depth <= settings.max_ray_depth) {
-        if (!ray_intersect_aabb_p(ray, scene.bounds))
-            break;
-
-        closest_intersection = ray_intersect_mesh_span(ray, scene.meshes);
+        closest_intersection = ray_intersect_acceleration_tree(ray, scene.acceleration_tree);
         if (closest_intersection) {
             const crt::Material &material = scene.materials[closest_intersection->material_index];
             has_refracted = material.type == crt::MaterialType::Refractive;

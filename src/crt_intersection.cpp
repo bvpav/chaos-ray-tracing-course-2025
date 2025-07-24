@@ -77,26 +77,29 @@ std::optional<Intersection> ray_intersect_triangle(const Ray &ray, const Triangl
             .flat_normal = flat_normal, .smooth_normal = smooth_normal,
             .uv = uv,
             .bary_u = bary_u, .bary_v = bary_v,
-            .material_index = -1
+            .material_index = triangle.material_index
         };
     }
 
     return std::nullopt;
 }
 
-std::optional<Intersection> ray_intersect_mesh_span(const Ray &ray, std::span<const Mesh> meshes) {
+std::optional<Intersection> ray_intersect_triangle_span(const Ray &ray, std::span<const Triangle> triangles) {
     std::optional<Intersection> closest_intersection = std::nullopt;
-    for (const auto &mesh : meshes) {
-        for (const auto &triangle : mesh.triangles) {
-            if (auto intersection = ray_intersect_triangle(ray, triangle)) {
-                intersection->material_index = mesh.material_index;
-                if (!closest_intersection || intersection->distance < closest_intersection->distance) {
-                    closest_intersection = intersection;
-                }
+
+    for (const auto &triangle : triangles) {
+        if (auto intersection = ray_intersect_triangle(ray, triangle)) {
+            if (!closest_intersection || intersection->distance < closest_intersection->distance) {
+                closest_intersection = intersection;
             }
         }
     }
+    
     return closest_intersection;
+}
+
+std::optional<Intersection> ray_intersect_acceleration_tree(const Ray &ray, const AccelerationTree &meshes) {
+    return std::nullopt;
 }
 
 }
