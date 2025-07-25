@@ -9,7 +9,7 @@
 namespace crt {
 
 // Q: Are these good values?
-inline constexpr int MAX_ACCELERATION_TREE_DEPTH = 50;
+inline constexpr int MAX_ACCELERATION_TREE_DEPTH = 10;
 inline constexpr int MAX_BOX_TRIANGLE_COUNT = 2;
 
 struct AccelerationTreeNode {
