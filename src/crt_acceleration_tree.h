@@ -8,10 +8,14 @@
 
 namespace crt {
 
+// Q: Are these good values?
+inline constexpr int MAX_ACCELERATION_TREE_DEPTH = 50;
+inline constexpr int MAX_BOX_TRIANGLE_COUNT = 2;
+
 struct AccelerationTreeNode {
     std::vector<Triangle> triangles;
     AABB bounds;
-    int children_indices[2];
+    std::array<int, 2> children_indices;
     int parent_index;
 };
 

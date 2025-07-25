@@ -161,7 +161,7 @@ static std::optional<ParsedMeshes> get_meshes_from_value(const rapidjson::Value 
         if (indices_it->value.Size() % 3 != 0) 
             return std::nullopt;
 
-        vertex_count += positions_it->value.Size();
+        vertex_count += positions_it->value.Size() / 3;
         triangle_count += indices_it->value.Size() / 3;
     }
 

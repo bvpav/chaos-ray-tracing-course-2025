@@ -21,7 +21,7 @@ public:
         m_normal = edge0.cross(edge1).normalized();
     }
 
-    Vector normal() const {
+    constexpr Vector normal() const {
         return m_normal;
     }
 
@@ -31,11 +31,11 @@ public:
         return edge0.cross(edge1).length() * 0.5;
     }
 
-    std::tuple<const Vertex &, const Vertex &, const Vertex &> vertices() const {
+    constexpr std::tuple<const Vertex &, const Vertex &, const Vertex &> vertices() const {
         return { m_v0, m_v1, m_v2 };
     }
 
-    std::tuple<Vector, Vector, Vector> edges() const {
+    constexpr std::tuple<Vector, Vector, Vector> edges() const {
         return {
             m_v1.position - m_v0.position,
             m_v2.position - m_v1.position,
