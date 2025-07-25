@@ -542,9 +542,13 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
     if (!camera)
         return std::nullopt;
 
-    auto bucket_size_it = image_settings_it->value.FindMember("bucket_size");
-    if (bucket_size_it == image_settings_it->value.MemberEnd() || !bucket_size_it->value.IsInt())
-        return std::nullopt;
+    int bucket_size = DEFAULT_SCENE_BUCKET_SIZE;
+    
+    if (auto it = image_settings_it->value.FindMember("bucket_size"); it != image_settings_it->value.MemberEnd()) {
+        if (!it->value.IsInt())
+            return std::nullopt;
+        bucket_size = it->value.GetInt();
+    }
 
     auto meshes_it = doc.FindMember("objects");
     if (meshes_it == doc.MemberEnd())
@@ -588,7 +592,7 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
         .lights = std::move(*lights),
         .textures = std::move(parsed_textures.textures),
         .materials = std::move(*materials),
-        .bucket_size = bucket_size_it->value.GetInt()
+        .bucket_size = bucket_size
     };
 }
 

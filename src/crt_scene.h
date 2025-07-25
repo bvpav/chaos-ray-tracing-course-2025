@@ -12,6 +12,8 @@
 
 namespace crt {
 
+inline constexpr int DEFAULT_SCENE_BUCKET_SIZE = 24;
+
 struct Scene {
     Color background_color;
     Camera camera;
