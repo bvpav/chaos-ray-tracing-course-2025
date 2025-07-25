@@ -2,8 +2,6 @@
 
 #include <cassert>
 #include <tuple>
-#include <utility>
-#include <vector>
 
 #include "crt_aabb.h"
 #include "crt_triangle.h"
@@ -30,24 +28,36 @@ static constexpr AABB get_triangle_aabb(const Triangle &triangle) noexcept {
     return result;
 }
 
-static void build_branch(AccelerationTree &acceleration_tree, int parent_index, std::span<const Triangle> triangle_span, int depth) {
-    if (depth > MAX_ACCELERATION_TREE_DEPTH || triangle_span.size() <= MAX_BOX_TRIANGLE_COUNT) {
+static void build_branch(AccelerationTree &acceleration_tree, int parent_index, std::vector<Triangle> triangles, int depth) {
+    if (depth > MAX_ACCELERATION_TREE_DEPTH || triangles.size() <= MAX_BOX_TRIANGLE_COUNT) {
         assert(acceleration_tree[parent_index].triangles.size() == 0);
-        acceleration_tree[parent_index].triangles = std::vector(triangle_span.begin(), triangle_span.end());
+        acceleration_tree[parent_index].triangles = std::move(triangles);
         return;
     }
 
     const auto [child0_bounds, child1_bounds] = acceleration_tree[parent_index].bounds.split(depth % 3); // Alternating the split axis
 
-    std::vector<Triangle> child0_triangles, child1_triangles;
+    std::vector<Triangle> &child0_triangles = triangles, child1_triangles;
+    child1_triangles.reserve(triangles.size() / 2);
 
-    for (const auto &triangle : triangle_span) {
+    auto child0_new_end = child0_triangles.begin();
+    for (const auto &triangle : child0_triangles) {
         AABB triangle_bounds = get_triangle_aabb(triangle);
-        if (child0_bounds.intersects(triangle_bounds)) 
-            child0_triangles.push_back(triangle);
-        if (child1_bounds.intersects(triangle_bounds)) 
+        bool is_in_child0 = child0_bounds.intersects(triangle_bounds);
+        bool is_in_child1 = child1_bounds.intersects(triangle_bounds);
+
+        if (!is_in_child0 && is_in_child1)
+            child1_triangles.push_back(std::move(triangle));
+        else if (is_in_child0 && is_in_child1)
+        {
+            *child0_new_end++ = triangle;
             child1_triangles.push_back(triangle);
+        }
+        else if (is_in_child0 && !is_in_child1)
+            *child0_new_end++ = std::move(triangle);
     }
+
+    child0_triangles.erase(child0_new_end, child0_triangles.end());
 
     // TODO: compress these ifs
     if (child0_triangles.size() > 0) {
@@ -59,7 +69,7 @@ static void build_branch(AccelerationTree &acceleration_tree, int parent_index, 
             .parent_index = parent_index
         });
         acceleration_tree[parent_index].children_indices[0] = child0_index;
-        build_branch(acceleration_tree, child0_index, child0_triangles, depth + 1);
+        build_branch(acceleration_tree, child0_index, std::move(child0_triangles), depth + 1);
     }
     if (child1_triangles.size() > 0) {
         int child1_index = acceleration_tree.size();
@@ -70,11 +80,11 @@ static void build_branch(AccelerationTree &acceleration_tree, int parent_index, 
             .parent_index = parent_index
         });
         acceleration_tree[parent_index].children_indices[1] = child1_index;
-        build_branch(acceleration_tree, child1_index, child1_triangles, depth + 1);
+        build_branch(acceleration_tree, child1_index, std::move(child1_triangles), depth + 1);
     }
 }
 
-AccelerationTree build(std::span<const Triangle> triangles) {
+AccelerationTree build(std::vector<Triangle> triangles) {
     // Build bounding box, encapsulating the triangles
     AABB bounds = AABB::vacuum();
 
@@ -91,7 +101,7 @@ AccelerationTree build(std::span<const Triangle> triangles) {
         .children_indices = { -1, -1 },
         .parent_index = -1,
     });
-    build_branch(acceleration_tree, 0, triangles, 0);
+    build_branch(acceleration_tree, 0, std::move(triangles), 0);
     return acceleration_tree;
 }
 

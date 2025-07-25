@@ -1,6 +1,6 @@
 #pragma once
 
-#include <span>
+#include <array>
 #include <vector>
 
 #include "crt_aabb.h"
@@ -23,7 +23,7 @@ using AccelerationTree = std::vector<AccelerationTreeNode>;
 
 namespace acceleration_tree {
 
-AccelerationTree build(std::span<const Triangle> triangles);
+AccelerationTree build(std::vector<Triangle> triangles);
 
 } // acceleration_tree
 

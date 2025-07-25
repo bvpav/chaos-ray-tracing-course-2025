@@ -1,5 +1,7 @@
 #pragma once
 
+#include <span>
+
 #include "crt_aabb.h"
 #include "crt_acceleration_tree.h"
 #include "crt_material.h"

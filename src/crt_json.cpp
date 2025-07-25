@@ -544,7 +544,7 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
     if (!meshes)
         return std::nullopt;
 
-    AccelerationTree acceleration_tree = acceleration_tree::build(meshes->triangles);
+    AccelerationTree acceleration_tree = acceleration_tree::build(std::move(meshes->triangles));
 
     auto lights_it = doc.FindMember("lights");
     if (lights_it == doc.MemberEnd())
