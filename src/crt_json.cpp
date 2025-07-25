@@ -190,9 +190,8 @@ static std::optional<ParsedMeshes> get_meshes_from_value(const rapidjson::Value 
         if (!indices)
             return std::nullopt;
 
-        auto uvs_it = v.FindMember("uvs");
-        if (uvs_it != v.MemberEnd()) {
-            std::optional<std::vector<Vector>> uvs = get_vector_array_from_value(uvs_it->value);
+        if (auto it = v.FindMember("uvs"); it != v.MemberEnd()) {
+            std::optional<std::vector<Vector>> uvs = get_vector_array_from_value(it->value);
             if (!uvs)
                 return std::nullopt;
 
@@ -444,7 +443,7 @@ static std::optional<ParsedTextures> get_textures_from_value(const rapidjson::Va
     return result;
 }
 
-static std::optional<std::vector<Material>> get_materials_from_value(const rapidjson::Value &value, const std::unordered_map<std::string_view, size_t> &texture_index_map) {
+static std::optional<std::vector<Material>> get_materials_from_value(const rapidjson::Value &value, ParsedTextures &parsed_textures) {
     if (!value.IsArray())
         return std::nullopt;
 
@@ -472,25 +471,35 @@ static std::optional<std::vector<Material>> get_materials_from_value(const rapid
         int albedo_map_texture_index = -1;
         if (type != MaterialType::Refractive) {
             auto albedo_it = v.FindMember("albedo");
-            if (albedo_it == v.MemberEnd() || !albedo_it->value.IsString())
+            if (albedo_it == v.MemberEnd())
                 return std::nullopt;
             
-            std::string_view albedo{ albedo_it->value.GetString(), albedo_it->value.GetStringLength() };
+            if (albedo_it->value.IsString()) {
+                std::string_view albedo{ albedo_it->value.GetString(), albedo_it->value.GetStringLength() };
 
-            auto albedo_map_texture_index_it = texture_index_map.find(albedo);
-            if (albedo_map_texture_index_it == texture_index_map.end())
-                return std::nullopt;
+                auto albedo_map_texture_index_it = parsed_textures.texture_index_map.find(albedo);
+                if (albedo_map_texture_index_it == parsed_textures.texture_index_map.end())
+                    return std::nullopt;
 
-            albedo_map_texture_index = albedo_map_texture_index_it->second;
+                albedo_map_texture_index = albedo_map_texture_index_it->second;
+            } else {
+                std::optional<AlbedoTexture> albedo_texture = get_albedo_texture_from_value(v);
+                if (!albedo_texture)
+                    return std::nullopt;
+
+                albedo_map_texture_index = parsed_textures.textures.size();
+                parsed_textures.textures.emplace_back(
+                    Texture { .type = TextureType::Albedo, .as_albedo_tex = std::move(*albedo_texture) }
+                );
+            }
         } else {
-            auto ior_it = v.FindMember("ior");
             // HACK: The `11-01-refractive/scene0.crtscene` scene has an unused refractive material with an albedo, instead of an IOR.
             //       I believe that to be an error in the file itself and I think IOR should be required for refractive materials.
             //       This is done to support lodading the official file, but it may be removed in the future.
-            if (ior_it != v.MemberEnd()) {
-                if (!ior_it->value.IsNumber())
+            if (auto it = v.FindMember("ior"); it != v.MemberEnd()) {
+                if (!it->value.IsNumber())
                     return std::nullopt;
-                ior = ior_it->value.GetFloat();
+                ior = it->value.GetFloat();
             }
         }
 
@@ -559,15 +568,15 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
     if (materials_it == doc.MemberEnd())
         return std::nullopt;
 
-    auto textures_it = doc.FindMember("textures");
-    if (textures_it == doc.MemberEnd())
-        return std::nullopt;
+	auto parsed_textures = [&]() -> ParsedTextures {
+	    if (auto it = doc.FindMember("textures"); it != doc.MemberEnd()) {
+	        if (auto res = get_textures_from_value(it->value, asset_root))
+	            return std::move(*res);
+	    }
+	    return {};
+	}();
 
-    std::optional<ParsedTextures> parsed_textures = get_textures_from_value(textures_it->value, asset_root);
-    if (!parsed_textures)
-        return std::nullopt;
-
-    std::optional<std::vector<Material>> materials = get_materials_from_value(materials_it->value, parsed_textures->texture_index_map);
+    std::optional<std::vector<Material>> materials = get_materials_from_value(materials_it->value, parsed_textures);
     if (!materials)
         return std::nullopt;
 
@@ -577,7 +586,7 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
         .vertices = std::move(meshes->vertices),
         .acceleration_tree = std::move(acceleration_tree),
         .lights = std::move(*lights),
-        .textures = std::move(parsed_textures->textures),
+        .textures = std::move(parsed_textures.textures),
         .materials = std::move(*materials),
         .bucket_size = bucket_size_it->value.GetInt()
     };
