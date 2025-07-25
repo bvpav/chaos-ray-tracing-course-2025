@@ -12,12 +12,12 @@ namespace crt {
  */
 class Triangle {
 public:
-    Triangle(const Vertex &v0, const Vertex &v1, const Vertex &v2, int material_index)
+    Triangle(const Vertex *v0, const Vertex *v1, const Vertex *v2, int material_index)
         : m_v0(v0), m_v1(v1), m_v2(v2)
         , material_index(material_index)
     {
-        Vector edge0 = m_v1.position - m_v0.position;
-        Vector edge1 = m_v2.position - m_v0.position;
+        Vector edge0 = m_v1->position - m_v0->position;
+        Vector edge1 = m_v2->position - m_v0->position;
         m_normal = edge0.cross(edge1).normalized();
     }
 
@@ -26,27 +26,27 @@ public:
     }
 
     float area() const {
-        Vector edge0 = m_v1.position - m_v0.position;
-        Vector edge1 = m_v2.position - m_v0.position;
+        Vector edge0 = m_v1->position - m_v0->position;
+        Vector edge1 = m_v2->position - m_v0->position;
         return edge0.cross(edge1).length() * 0.5;
     }
 
     constexpr std::tuple<const Vertex &, const Vertex &, const Vertex &> vertices() const {
-        return { m_v0, m_v1, m_v2 };
+        return { *m_v0, *m_v1, *m_v2 };
     }
 
     constexpr std::tuple<Vector, Vector, Vector> edges() const {
         return {
-            m_v1.position - m_v0.position,
-            m_v2.position - m_v1.position,
-            m_v0.position - m_v2.position
+            m_v1->position - m_v0->position,
+            m_v2->position - m_v1->position,
+            m_v0->position - m_v2->position
         };
     }
 
     int material_index;
 
 private:
-    const Vertex &m_v0, &m_v1, &m_v2;
+    const Vertex *m_v0, *m_v1, *m_v2;
     Vector m_normal;
 };
 

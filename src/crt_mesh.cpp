@@ -28,7 +28,7 @@ void vertex_array_extend(
     for (size_t i = 0; i < indices.size(); i += 3) {
         // HACK: maybe storing references is not a good idea
         Vertex &v0 = vertices[base_index + indices[i]], &v1 = vertices[base_index + indices[i + 1]], &v2 = vertices[base_index + indices[i + 2]];
-        triangles.emplace_back(v0, v1, v2, material_index);
+        triangles.emplace_back(&v0, &v1, &v2, material_index);
         v0.normal += triangles.back().normal();
         v1.normal += triangles.back().normal();
         v2.normal += triangles.back().normal();
