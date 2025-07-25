@@ -1,4 +1,4 @@
-# 13 Optimizations: Task 1
+# 14 Optimizations 02: Task 1
 
 | Optimization                                  | Render time in seconds |
 | --------------------------------------------- | ---------------------: |
@@ -8,6 +8,7 @@
 | Regions rendering                             |                9.33183 |
 | Buckets rendering                             |                9.24362 |
 | Bounding Box                                  |                2.58989 |
+| **KD tree**                                   |           **0.066962** |
 
 > [!NOTE]
 > Benchmarks were ran on a Lenovo Legion Slim 5 16AHP9 laptop, with the
@@ -22,4 +23,5 @@
 | **OS**  | Fedora Linux 41 (Workstation Edition) 64-bit<br>Linux 6.15.4-100.fc41.x86_64 |
 | **FS**  | Btrfs                                                                        |
 
-[![13 Optimizations: Task 1](../results/png/13-01-optimizations.png)](../results/ppm/13-01-optimizations.ppm)
+[![14 Optimizations 02: Task 1: Benchmarking Scene](../results/png/14-01-acceleration-tree-scene1.png)](../results/ppm/14-01-acceleration-tree-scene1.ppm)
+[![14 Optimizations 02: Task 1: Debugging Scene](../results/png/14-01-acceleration-tree-scene0.png)](../results/ppm/14-01-acceleration-tree-scene0.ppm)
