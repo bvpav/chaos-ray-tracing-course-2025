@@ -1,5 +1,9 @@
 #include "crt_intersection.h"
 
+#include <cassert>
+#include <stack>
+
+#include "crt_acceleration_tree.h"
 #include "crt_ray.h"
 #include "crt_triangle.h"
 #include "crt_vector.h"
@@ -98,8 +102,33 @@ std::optional<Intersection> ray_intersect_triangle_span(const Ray &ray, std::spa
     return closest_intersection;
 }
 
-std::optional<Intersection> ray_intersect_acceleration_tree(const Ray &ray, const AccelerationTree &meshes) {
-    return std::nullopt;
+std::optional<Intersection> ray_intersect_acceleration_tree(const Ray &ray, const AccelerationTree &acceleration_tree) {
+    std::optional<Intersection> closest_intersection = std::nullopt;
+
+    assert(!acceleration_tree.empty());
+
+    std::stack<int> node_indices_to_check{{ 0 }};
+
+    while (!node_indices_to_check.empty()) {
+        const int node_index = node_indices_to_check.top();
+        node_indices_to_check.pop();
+        const AccelerationTreeNode &node = acceleration_tree[node_index];
+
+        if (ray_intersect_aabb_p(ray, node.bounds)) {
+            if (node.is_leaf()) {
+                auto intersection = ray_intersect_triangle_span(ray, node.triangles);
+                if (intersection && (!closest_intersection || intersection->distance < closest_intersection->distance)) 
+                    closest_intersection = intersection;
+            } else {
+                if (node.children_indices[0] != -1)
+                    node_indices_to_check.push(node.children_indices[0]);
+                if (node.children_indices[1] != -1)
+                    node_indices_to_check.push(node.children_indices[1]);
+            }
+        }
+    }
+
+    return closest_intersection;
 }
 
 }

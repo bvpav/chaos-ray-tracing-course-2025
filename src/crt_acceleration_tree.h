@@ -17,6 +17,10 @@ struct AccelerationTreeNode {
     AABB bounds;
     std::array<int, 2> children_indices;
     int parent_index;
+
+    constexpr bool is_leaf() const noexcept {
+        return triangles.size() > 0;
+    }
 };
 
 using AccelerationTree = std::vector<AccelerationTreeNode>;

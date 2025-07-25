@@ -31,7 +31,7 @@ namespace intersection {
 bool ray_intersect_aabb_p(const Ray &ray, const AABB &aabb);
 std::optional<Intersection> ray_intersect_triangle(const Ray &ray, const Triangle &triangle);
 std::optional<Intersection> ray_intersect_triangle_span(const Ray &ray, std::span<const Triangle> triangles);
-std::optional<Intersection> ray_intersect_acceleration_tree(const Ray &ray, const AccelerationTree &meshes);
+std::optional<Intersection> ray_intersect_acceleration_tree(const Ray &ray, const AccelerationTree &acceleration_tree);
 
 } // namespace intersection
 

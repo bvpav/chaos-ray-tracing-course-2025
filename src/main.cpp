@@ -21,7 +21,7 @@ constexpr float REFRACTION_BIAS = 1e-2f;
 int main(int argc, char *argv[]) {
     using namespace std::chrono;
 
-    std::filesystem::path input_file_path = argc > 1 ? argv[1] : "../scenes/14-01-acceleration-tree/scene0-with-textures.crtscene";
+    std::filesystem::path input_file_path = argc > 1 ? argv[1] : "../scenes/14-01-acceleration-tree/scene1-with-textures.crtscene";
 
     std::ifstream input_file{ input_file_path, std::ios::in | std::ios::binary };
     if (!input_file.is_open()) {
