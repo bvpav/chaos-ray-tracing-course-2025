@@ -175,10 +175,6 @@ static std::optional<ParsedMeshes> get_meshes_from_value(const rapidjson::Value 
         auto positions_it = v.FindMember("vertices");
         assert(positions_it != v.MemberEnd());
 
-        auto uvs_it = v.FindMember("uvs");
-        if (uvs_it == v.MemberEnd())
-            return std::nullopt;
-
         auto indices_it = v.FindMember("triangles");
         assert(indices_it != v.MemberEnd());
 
@@ -190,18 +186,23 @@ static std::optional<ParsedMeshes> get_meshes_from_value(const rapidjson::Value 
         if (!positions)
             return std::nullopt;
 
-        std::optional<std::vector<Vector>> uvs = get_vector_array_from_value(uvs_it->value);
-        if (!uvs)
-            return std::nullopt;
-
-        if (uvs->size() != positions->size())
-            return std::nullopt;;
-
         std::optional<std::vector<int>> indices = get_int_array_from_value(indices_it->value);
         if (!indices)
             return std::nullopt;
 
-        vertex_array_extend(result.vertices, result.triangles, *positions, *uvs, *indices, material_index_it->value.GetInt());
+        auto uvs_it = v.FindMember("uvs");
+        if (uvs_it != v.MemberEnd()) {
+            std::optional<std::vector<Vector>> uvs = get_vector_array_from_value(uvs_it->value);
+            if (!uvs)
+                return std::nullopt;
+
+            if (uvs->size() != positions->size())
+                return std::nullopt;
+
+            vertex_array_extend(result.vertices, result.triangles, *positions, *uvs, *indices, material_index_it->value.GetInt());
+        } else {
+            vertex_array_extend(result.vertices, result.triangles, *positions, *indices, material_index_it->value.GetInt());
+        }
     }
 
     return result;
