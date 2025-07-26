@@ -22,19 +22,19 @@ namespace crt {
 
 using namespace intersection;
 
-static std::optional<Intersection> trace_ray(const crt::Ray &ray, const crt::Scene &scene) {
+static std::optional<Intersection> trace_ray(const Ray &ray, const Scene &scene) {
     return ray_intersect_acceleration_tree(ray, scene.acceleration_tree);
 }
 
-static std::optional<Intersection> trace_ray_with_refractions(const crt::Ray &ray, const crt::Scene &scene, const RendererSettings &settings) {
-    crt::Ray r = ray;
+static std::optional<Intersection> trace_ray_with_refractions(const Ray &ray, const Scene &scene, const RendererSettings &settings) {
+    Ray r = ray;
     std::optional<Intersection> closest_intersection = std::nullopt;
     bool has_refracted = false;
     while (has_refracted && r.depth <= settings.max_ray_depth) {
         closest_intersection = ray_intersect_acceleration_tree(ray, scene.acceleration_tree);
         if (closest_intersection) {
-            const crt::Material &material = scene.materials[closest_intersection->material_index];
-            has_refracted = material.type == crt::MaterialType::Refractive;
+            const Material &material = scene.materials[closest_intersection->material_index];
+            has_refracted = material.type == MaterialType::Refractive;
             if (has_refracted) {
                 has_refracted = r.refract_at(closest_intersection->point, closest_intersection->normal(material), material.ior, settings.refraction_bias);
             }
@@ -43,42 +43,42 @@ static std::optional<Intersection> trace_ray_with_refractions(const crt::Ray &ra
     return closest_intersection;
 }
 
-static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const RendererSettings &settings, PCG32 &rng) {
+static Color shade_ray(const Ray &ray, const Scene &scene, const RendererSettings &settings, PCG32 &rng) {
     if (ray.depth > settings.max_ray_depth)
-        return crt::Color { 0.0f, 0.0f, 0.0f };
+        return Color { 0.0f, 0.0f, 0.0f };
 
     if (auto intersection = trace_ray(ray, scene)) {
-        const crt::Material &material = scene.materials[intersection->material_index];
-        const crt::Texture &albedo_map = scene.textures[material.albedo_map_texture_index];
-        crt::Vector normal = intersection->normal(material);
+        const Material &material = scene.materials[intersection->material_index];
+        const Texture &albedo_map = scene.textures[material.albedo_map_texture_index];
+        Vector normal = intersection->normal(material);
 
         switch (material.type) {
-            case crt::MaterialType::Diffuse: {
-                crt::Color final_color{};
+            case MaterialType::Diffuse: {
+                Color final_color{};
 
                 // Compute diffuse reflections (GI)
                 {
-                    const crt::Vector right = ray.direction.cross(normal).normalize();
-                    const crt::Vector &up = normal;
-                    const crt::Vector forward = right.cross(up);
+                    const Vector right = ray.direction.cross(normal).normalize();
+                    const Vector &up = normal;
+                    const Vector forward = right.cross(up);
 
-                    const crt::Matrix local_hit_matrix = Matrix::from_axes(right, up, forward);
+                    const Matrix local_hit_matrix = Matrix::from_axes(right, up, forward);
 
                     const float rand_angle_xy = std::numbers::pi_v<float> * rng.uniform();
-                    crt::Vector direction{ std::cos(rand_angle_xy), std::sin(rand_angle_xy), 0.0f };
+                    Vector direction{ std::cos(rand_angle_xy), std::sin(rand_angle_xy), 0.0f };
 
                     const float rand_angle_xz = 2.0f * std::numbers::pi_v<float> * rng.uniform();
-                    const crt::Matrix rotation = Matrix::rotation_y(rand_angle_xz);
+                    const Matrix rotation = Matrix::rotation_y(rand_angle_xz);
                     direction *= rotation;
                     direction *= local_hit_matrix;
 
                     // TODO: maybe enable diffuse reflections to have an independent bias?
-                    crt::Ray diffuse_reflection_ray{ intersection->point + normal * settings.reflection_bias, direction, ray.depth + 1 };
+                    Ray diffuse_reflection_ray{ intersection->point + normal * settings.reflection_bias, direction, ray.depth + 1 };
                     final_color += shade_ray(diffuse_reflection_ray, scene, settings, rng);
                 }
 
                 for (const auto &light : scene.lights) {
-                    crt::Vector light_dir = light.position - intersection->point;
+                    Vector light_dir = light.position - intersection->point;
                     float sphere_radius_squared = light_dir.length_squared();
                     light_dir.normalize();
 
@@ -86,7 +86,7 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const 
 
                     float sphere_area = 4 * std::numbers::pi_v<float> * sphere_radius_squared;
 
-                    crt::Ray shadow_ray{ intersection->point + normal * settings.shadow_bias, light_dir };
+                    Ray shadow_ray{ intersection->point + normal * settings.shadow_bias, light_dir };
                     auto shadow_intersection = trace_ray_with_refractions(shadow_ray, scene, settings);
                     bool is_illuminated = !shadow_intersection.has_value() || shadow_intersection->distance * shadow_intersection->distance > sphere_radius_squared;
                     if (is_illuminated) {
@@ -97,12 +97,12 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const 
                 return final_color;
             }
 
-            case crt::MaterialType::Reflective: {
-                crt::Ray reflection_ray = ray.reflected_at(intersection->point, normal, settings.reflection_bias);
+            case MaterialType::Reflective: {
+                Ray reflection_ray = ray.reflected_at(intersection->point, normal, settings.reflection_bias);
                 return albedo_map.sample(intersection->uv, intersection->bary_u, intersection->bary_v) * shade_ray(reflection_ray, scene, settings, rng);
             }
 
-            case crt::MaterialType::Refractive: {
+            case MaterialType::Refractive: {
                 // HACK: Assuming the external environment is always air and when rays
                 //       leave transparent objects, they always enter air.
                 float outside_ior = 1.0f;
@@ -113,13 +113,13 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const 
                     std::swap(inside_ior, outside_ior);
                 }
 
-                std::optional<crt::Ray> refraction_ray = ray.refracted_at(intersection->point, normal, outside_ior, inside_ior, settings.refraction_bias);
-                crt::Ray reflection_ray = ray.reflected_at(intersection->point, normal, settings.reflection_bias);
+                std::optional<Ray> refraction_ray = ray.refracted_at(intersection->point, normal, outside_ior, inside_ior, settings.refraction_bias);
+                Ray reflection_ray = ray.reflected_at(intersection->point, normal, settings.reflection_bias);
 
-                crt::Color reflection_color = shade_ray(reflection_ray, scene, settings, rng);
+                Color reflection_color = shade_ray(reflection_ray, scene, settings, rng);
 
                 if (refraction_ray) {
-                    crt::Color refraction_color = shade_ray(*refraction_ray, scene, settings, rng);
+                    Color refraction_color = shade_ray(*refraction_ray, scene, settings, rng);
                     float fresnel = 0.5f * std::pow((1.0f + ray.direction.dot(normal)), 5.0f);
                     return reflection_color * fresnel + refraction_color * (1.0f - fresnel);
                 } else {
@@ -127,7 +127,7 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const 
                 }
             }
 
-            case crt::MaterialType::Constant: {
+            case MaterialType::Constant: {
                 return albedo_map.sample(intersection->uv, intersection->bary_u, intersection->bary_v);
             }
         }
