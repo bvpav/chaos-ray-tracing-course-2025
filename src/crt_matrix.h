@@ -22,6 +22,14 @@ struct Matrix {
     static Matrix rotation_y(const float angle_radians);
     static Matrix rotation_z(const float angle_radians);
 
+    static constexpr Matrix from_axes(const Vector &right, const Vector &up, const Vector &forward) {
+        return {{
+            {  right.x,   right.y,   right.z},
+            {     up.x,      up.y,      up.z},
+            {forward.x, forward.y, forward.z}
+        }};
+    }
+
     constexpr Matrix operator*(const Matrix &rhs) const {
         Matrix result{ *this };
         result *= rhs;

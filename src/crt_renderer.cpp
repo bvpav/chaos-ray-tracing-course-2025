@@ -4,6 +4,7 @@
 #include <cassert>
 #include <cmath>
 #include <mutex>
+#include <numbers>
 #include <optional>
 #include <queue>
 #include <thread>
@@ -12,6 +13,10 @@
 
 #include "crt_image.h"
 #include "crt_intersection.h"
+#include "crt_matrix.h"
+#include "crt_random.h"
+#include "crt_ray.h"
+#include "crt_vector.h"
 
 namespace crt {
 
@@ -38,7 +43,7 @@ static std::optional<Intersection> trace_ray_with_refractions(const crt::Ray &ra
     return closest_intersection;
 }
 
-static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const RendererSettings &settings) {
+static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const RendererSettings &settings, PCG32 &rng) {
     if (ray.depth > settings.max_ray_depth)
         return crt::Color { 0.0f, 0.0f, 0.0f };
 
@@ -50,6 +55,27 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const 
         switch (material.type) {
             case crt::MaterialType::Diffuse: {
                 crt::Color final_color{};
+
+                // Compute diffuse reflections (GI)
+                {
+                    const crt::Vector right = ray.direction.cross(normal).normalize();
+                    const crt::Vector &up = normal;
+                    const crt::Vector forward = right.cross(up);
+
+                    const crt::Matrix local_hit_matrix = Matrix::from_axes(right, up, forward);
+
+                    const float rand_angle_xy = std::numbers::pi_v<float> * rng.uniform();
+                    crt::Vector direction{ std::cos(rand_angle_xy), std::sin(rand_angle_xy), 0.0f };
+
+                    const float rand_angle_xz = 2.0f * std::numbers::pi_v<float> * rng.uniform();
+                    const crt::Matrix rotation = Matrix::rotation_y(rand_angle_xz);
+                    direction *= rotation;
+                    direction *= local_hit_matrix;
+
+                    // TODO: maybe enable diffuse reflections to have an independent bias?
+                    crt::Ray diffuse_reflection_ray{ intersection->point + normal * settings.reflection_bias, direction, ray.depth + 1 };
+                    final_color += shade_ray(diffuse_reflection_ray, scene, settings, rng);
+                }
 
                 for (const auto &light : scene.lights) {
                     crt::Vector light_dir = light.position - intersection->point;
@@ -73,7 +99,7 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const 
 
             case crt::MaterialType::Reflective: {
                 crt::Ray reflection_ray = ray.reflected_at(intersection->point, normal, settings.reflection_bias);
-                return albedo_map.sample(intersection->uv, intersection->bary_u, intersection->bary_v) * shade_ray(reflection_ray, scene, settings);
+                return albedo_map.sample(intersection->uv, intersection->bary_u, intersection->bary_v) * shade_ray(reflection_ray, scene, settings, rng);
             }
 
             case crt::MaterialType::Refractive: {
@@ -90,10 +116,10 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const 
                 std::optional<crt::Ray> refraction_ray = ray.refracted_at(intersection->point, normal, outside_ior, inside_ior, settings.refraction_bias);
                 crt::Ray reflection_ray = ray.reflected_at(intersection->point, normal, settings.reflection_bias);
 
-                crt::Color reflection_color = shade_ray(reflection_ray, scene, settings);
+                crt::Color reflection_color = shade_ray(reflection_ray, scene, settings, rng);
 
                 if (refraction_ray) {
-                    crt::Color refraction_color = shade_ray(*refraction_ray, scene, settings);
+                    crt::Color refraction_color = shade_ray(*refraction_ray, scene, settings, rng);
                     float fresnel = 0.5f * std::pow((1.0f + ray.direction.dot(normal)), 5.0f);
                     return reflection_color * fresnel + refraction_color * (1.0f - fresnel);
                 } else {
@@ -115,8 +141,9 @@ static crt::Color shade_ray(const crt::Ray &ray, const crt::Scene &scene, const 
 static void render_region(const Scene &scene, const RendererSettings &settings, int x, int y, int width, int height, Image &result) {
     for (int raster_y = y; raster_y < y + height; ++raster_y) {
         for (int raster_x = x; raster_x < x + width; ++raster_x) {
+            PCG32 rng = make_pcg(raster_x, raster_y);
             Ray camera_ray = scene.camera.generate_ray(raster_x, raster_y);
-            result.buffer[raster_y * result.width + raster_x] = shade_ray(camera_ray, scene, settings);
+            result.buffer[raster_y * result.width + raster_x] = shade_ray(camera_ray, scene, settings, rng);
         }
     }
 }
