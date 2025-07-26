@@ -9,8 +9,10 @@ namespace crt {
 
 struct RendererSettings {
     uint32_t max_ray_depth;
+    uint32_t diffuse_reflection_ray_count;
     float shadow_bias;
     float reflection_bias;
+    float diffuse_reflection_bias;
     float refraction_bias;
 };
 

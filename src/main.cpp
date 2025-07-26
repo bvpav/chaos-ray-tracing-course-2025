@@ -13,15 +13,17 @@
 static constexpr int MAX_COLOR_COMPONENT = 0xFF;
 
 constexpr int MAX_RAY_DEPTH = 5;
+constexpr int DIFFUSE_REFLECTION_RAY_COUNT = 100;
 
 constexpr float SHADOW_BIAS = 1e-2f;
 constexpr float REFLECTION_BIAS = 1e-2f;
+constexpr float DIFFUSE_REFLECTION_BIAS = 1e-2f;
 constexpr float REFRACTION_BIAS = 1e-2f;
 
 int main(int argc, char *argv[]) {
     using namespace std::chrono;
 
-    std::filesystem::path input_file_path = argc > 1 ? argv[1] : "../scenes/15-01-conclusion/scene0.crtscene";
+    std::filesystem::path input_file_path = argc > 1 ? argv[1] : "../scenes/15-01-conclusion/scene1.crtscene";
 
     std::ifstream input_file{ input_file_path, std::ios::in | std::ios::binary };
     if (!input_file.is_open()) {
@@ -44,8 +46,10 @@ int main(int argc, char *argv[]) {
 
     crt::RendererSettings settings{
         .max_ray_depth = MAX_RAY_DEPTH,
+        .diffuse_reflection_ray_count = DIFFUSE_REFLECTION_RAY_COUNT,
         .shadow_bias = SHADOW_BIAS,
         .reflection_bias = REFLECTION_BIAS,
+        .diffuse_reflection_bias = DIFFUSE_REFLECTION_BIAS,
         .refraction_bias = REFRACTION_BIAS,
     };
 

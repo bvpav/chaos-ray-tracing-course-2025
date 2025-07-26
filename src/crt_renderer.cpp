@@ -57,7 +57,7 @@ static Color shade_ray(const Ray &ray, const Scene &scene, const RendererSetting
                 Color final_color{};
 
                 // Compute diffuse reflections (GI)
-                {
+                for (int i = 0; i < settings.diffuse_reflection_ray_count; ++i) {
                     const Vector right = ray.direction.cross(normal).normalize();
                     const Vector &up = normal;
                     const Vector forward = right.cross(up);
@@ -73,9 +73,11 @@ static Color shade_ray(const Ray &ray, const Scene &scene, const RendererSetting
                     direction *= local_hit_matrix;
 
                     // TODO: maybe enable diffuse reflections to have an independent bias?
-                    Ray diffuse_reflection_ray{ intersection->point + normal * settings.reflection_bias, direction, ray.depth + 1 };
+                    Ray diffuse_reflection_ray{ intersection->point + normal * settings.diffuse_reflection_bias, direction, ray.depth + 1 };
                     final_color += shade_ray(diffuse_reflection_ray, scene, settings, rng);
                 }
+
+                final_color /= settings.diffuse_reflection_ray_count + 1;
 
                 for (const auto &light : scene.lights) {
                     Vector light_dir = light.position - intersection->point;
