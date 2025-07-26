@@ -21,6 +21,14 @@
 			0, 0, 0
 		]
 	},
+
+	"materials": [{
+		"type": "diffuse",
+		"albedo": [
+			0.9, 0.9, 0.9
+		],
+		"smooth_shading": true
+	}],
 	
 	"lights": [
 		{	
@@ -45,6 +53,7 @@
 	
 	"objects": [
 		{		
+			"material_index": 0,
 			"vertices": [
 				-1.5, -1, -1.5,
 				1.5, -1, -1.5,
@@ -58,6 +67,7 @@
 			]
 		},
 		{		
+			"material_index": 0,
 			"vertices": [
 				-8.16502e-10, -0.5000001, -3,
 				-8.16502e-10, -0.4698464, -2.82899,
