@@ -57,24 +57,26 @@ static Color shade_ray(const Ray &ray, const Scene &scene, const RendererSetting
                 Color final_color{};
 
                 // Compute diffuse reflections (GI)
-                for (int i = 0; i < settings.diffuse_reflection_ray_count; ++i) {
-                    const Vector right = ray.direction.cross(normal).normalize();
-                    const Vector &up = normal;
-                    const Vector forward = right.cross(up);
+                if (scene.gi_on) {
+                    for (int i = 0; i < settings.diffuse_reflection_ray_count; ++i) {
+                        const Vector right = ray.direction.cross(normal).normalize();
+                        const Vector &up = normal;
+                        const Vector forward = right.cross(up);
 
-                    const Matrix local_hit_matrix = Matrix::from_axes(right, up, forward);
+                        const Matrix local_hit_matrix = Matrix::from_axes(right, up, forward);
 
-                    const float rand_angle_xy = std::numbers::pi_v<float> * rng.uniform();
-                    Vector direction{ std::cos(rand_angle_xy), std::sin(rand_angle_xy), 0.0f };
+                        const float rand_angle_xy = std::numbers::pi_v<float> * rng.uniform();
+                        Vector direction{ std::cos(rand_angle_xy), std::sin(rand_angle_xy), 0.0f };
 
-                    const float rand_angle_xz = 2.0f * std::numbers::pi_v<float> * rng.uniform();
-                    const Matrix rotation = Matrix::rotation_y(rand_angle_xz);
-                    direction *= rotation;
-                    direction *= local_hit_matrix;
+                        const float rand_angle_xz = 2.0f * std::numbers::pi_v<float> * rng.uniform();
+                        const Matrix rotation = Matrix::rotation_y(rand_angle_xz);
+                        direction *= rotation;
+                        direction *= local_hit_matrix;
 
-                    // TODO: maybe enable diffuse reflections to have an independent bias?
-                    Ray diffuse_reflection_ray{ intersection->point + normal * settings.diffuse_reflection_bias, direction, ray.depth + 1 };
-                    final_color += shade_ray(diffuse_reflection_ray, scene, settings, rng);
+                        // TODO: maybe enable diffuse reflections to have an independent bias?
+                        Ray diffuse_reflection_ray{ intersection->point + normal * settings.diffuse_reflection_bias, direction, ray.depth + 1 };
+                        final_color += shade_ray(diffuse_reflection_ray, scene, settings, rng);
+                    }
                 }
 
                 final_color /= settings.diffuse_reflection_ray_count + 1;
@@ -101,10 +103,14 @@ static Color shade_ray(const Ray &ray, const Scene &scene, const RendererSetting
 
             case MaterialType::Reflective: {
                 Ray reflection_ray = ray.reflected_at(intersection->point, normal, settings.reflection_bias);
-                return albedo_map.sample(intersection->uv, intersection->bary_u, intersection->bary_v) * shade_ray(reflection_ray, scene, settings, rng);
+                Color albedo = albedo_map.sample(intersection->uv, intersection->bary_u, intersection->bary_v);
+                return scene.reflections_on ? albedo * shade_ray(reflection_ray, scene, settings, rng) : albedo;
             }
 
             case MaterialType::Refractive: {
+                if (!scene.refractions_on)
+                    return Color { 0.0f, 0.0f, 0.0f };
+
                 // HACK: Assuming the external environment is always air and when rays
                 //       leave transparent objects, they always enter air.
                 float outside_ior = 1.0f;

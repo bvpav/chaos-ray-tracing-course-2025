@@ -584,6 +584,24 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
     if (!materials)
         return std::nullopt;
 
+    bool gi_on = false, reflections_on = true, refractions_on = true;
+
+    if (auto it = settings_it->value.FindMember("gi_on"); it != settings_it->value.MemberEnd()) {
+        if (!it->value.IsBool())
+            return std::nullopt;
+        gi_on = it->value.GetBool();
+    }
+    if (auto it = settings_it->value.FindMember("reflections_on"); it != settings_it->value.MemberEnd()) {
+        if (!it->value.IsBool())
+            return std::nullopt;
+        reflections_on = it->value.GetBool();
+    }
+    if (auto it = settings_it->value.FindMember("refractions_on"); it != settings_it->value.MemberEnd()) {
+        if (!it->value.IsBool())
+            return std::nullopt;
+        refractions_on = it->value.GetBool();
+    }
+
     return Scene {
         .background_color = std::move(*bg_color),
         .camera = std::move(*camera),
@@ -592,7 +610,10 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
         .lights = std::move(*lights),
         .textures = std::move(parsed_textures.textures),
         .materials = std::move(*materials),
-        .bucket_size = bucket_size
+        .bucket_size = bucket_size,
+        .gi_on = gi_on,
+        .reflections_on = reflections_on,
+        .refractions_on = refractions_on
     };
 }
 
