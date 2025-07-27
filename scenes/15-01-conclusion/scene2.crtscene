@@ -22,7 +22,9 @@
 		
 		"position": [
 			0, 0, 2.12
-		]
+		],
+		
+		"fov_degrees": 45
 	},
 	
 	"lights": [

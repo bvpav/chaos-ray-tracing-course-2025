@@ -131,6 +131,14 @@ static std::optional<Camera> get_camera_from_value(const rapidjson::Value &camer
     if (!transform)
         return std::nullopt;
 
+    if (auto it = camera_value.FindMember("fov_degrees"); it != camera_value.MemberEnd()) {
+        if (!it->value.IsNumber())
+            return std::nullopt;
+
+        float fov_degrees = it->value.GetFloat();
+        return Camera { width_it->value.GetInt(), height_it->value.GetInt(), fov_degrees, std::move(*transform) };
+    }
+
     return Camera { width_it->value.GetInt(), height_it->value.GetInt(), std::move(*transform) };
 }
 

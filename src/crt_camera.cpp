@@ -1,5 +1,7 @@
 #include "crt_camera.h"
 
+#include <cmath>
+
 namespace crt {
 
 Ray Camera::generate_ray(int raster_x, int raster_y) const {
@@ -18,6 +20,10 @@ Ray Camera::generate_ray(int raster_x, int raster_y) const {
 
     // Consider aspect ratio
     ray.direction.x *= float(m_resolution_x) / m_resolution_y;
+
+    // Apply FOV
+    ray.direction.x *= std::tan(m_fov_radians * 0.5f);
+    ray.direction.y *= std::tan(m_fov_radians * 0.5f);
 
     ray.origin = m_transform.location;
 

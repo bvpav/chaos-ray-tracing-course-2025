@@ -4,13 +4,20 @@
 #include "crt_ray.h"
 #include "crt_transform.h"
 
+#include <numbers>
+
 namespace crt {
 
 class Camera {
 public:
     Camera(int resolution_x, int resolution_y, const Transform &transform = {})
+        : Camera(resolution_x, resolution_y, 90.0f, transform)
+    {}
+
+    Camera(int resolution_x, int resolution_y, float fov_degrees, const Transform &transform = {})
         : m_resolution_x(resolution_x)
         , m_resolution_y(resolution_y)
+        , m_fov_radians(fov_degrees * std::numbers::pi_v<float> / 180.0f)
         , m_transform(transform)
     {}
 
@@ -58,6 +65,7 @@ public:
 
 private:
     int m_resolution_x, m_resolution_y;
+    float m_fov_radians;
     Transform m_transform;
 };
 
