@@ -2,11 +2,11 @@
 #include <fstream>
 #include <iostream>
 
-#include "crt_image.h"
-#include "crt_image_ppm.h"
-#include "crt_json.h"
-#include "crt_renderer.h"
-#include "crt_scene.h"
+#include "core/crt_image.h"
+#include "core/crt_image_ppm.h"
+#include "core/crt_json.h"
+#include "core/crt_renderer.h"
+#include "core/crt_scene.h"
 
 // TODO: move to configuration
 
