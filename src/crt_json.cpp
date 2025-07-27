@@ -139,7 +139,7 @@ struct ParsedMeshes {
     std::vector<Triangle> triangles;
 };
 
-static std::optional<ParsedMeshes> get_meshes_from_value(const rapidjson::Value &value) {
+static std::optional<ParsedMeshes> get_meshes_from_value(const rapidjson::Value &value, const std::vector<TriangleFlags> &material_triangle_flags) {
     if (!value.IsArray())
         return std::nullopt;
 
@@ -182,6 +182,8 @@ static std::optional<ParsedMeshes> get_meshes_from_value(const rapidjson::Value 
         if (material_index_it == v.MemberEnd() || !material_index_it->value.IsInt())
             return std::nullopt;
 
+        int material_index = material_index_it->value.GetInt();
+
         std::optional<std::vector<Vector>> positions = get_vector_array_from_value(positions_it->value);
         if (!positions)
             return std::nullopt;
@@ -198,9 +200,9 @@ static std::optional<ParsedMeshes> get_meshes_from_value(const rapidjson::Value 
             if (uvs->size() != positions->size())
                 return std::nullopt;
 
-            vertex_array_extend(result.vertices, result.triangles, *positions, *uvs, *indices, material_index_it->value.GetInt());
+            vertex_array_extend(result.vertices, result.triangles, *positions, *uvs, *indices, material_index, material_triangle_flags[material_index]);
         } else {
-            vertex_array_extend(result.vertices, result.triangles, *positions, *indices, material_index_it->value.GetInt());
+            vertex_array_extend(result.vertices, result.triangles, *positions, *indices, material_index, material_triangle_flags[material_index]);
         }
     }
 
@@ -443,12 +445,18 @@ static std::optional<ParsedTextures> get_textures_from_value(const rapidjson::Va
     return result;
 }
 
-static std::optional<std::vector<Material>> get_materials_from_value(const rapidjson::Value &value, ParsedTextures &parsed_textures) {
+struct ParsedMaterials {
+    std::vector<Material> materials;
+    std::vector<TriangleFlags> triangle_flags;
+};
+
+static std::optional<ParsedMaterials> get_materials_from_value(const rapidjson::Value &value, ParsedTextures &parsed_textures) {
     if (!value.IsArray())
         return std::nullopt;
 
-    std::vector<Material> materials;
-    materials.reserve(value.Size());
+    ParsedMaterials result;
+    result.materials.reserve(value.Size());
+    result.triangle_flags.reserve(value.Size());
 
     for (const auto &v : value.GetArray()) {
         if (!v.IsObject())
@@ -461,6 +469,13 @@ static std::optional<std::vector<Material>> get_materials_from_value(const rapid
         auto smooth_shading_it = v.FindMember("smooth_shading");
         if (smooth_shading_it == v.MemberEnd() || !smooth_shading_it->value.IsBool())
             return std::nullopt;
+
+        bool back_face_culling = false;
+        if (auto it = v.FindMember("back_face_culling"); it != v.MemberEnd()) {
+            if (!it->value.IsBool())
+                return std::nullopt;
+            back_face_culling = it->value.GetBool();
+        }
 
         std::optional<MaterialType> type = get_material_type_from_value(type_it->value);
         if (!type)
@@ -503,10 +518,17 @@ static std::optional<std::vector<Material>> get_materials_from_value(const rapid
             }
         }
 
-        materials.emplace_back(*type, albedo_map_texture_index, ior, smooth_shading_it->value.GetBool());
+        result.materials.emplace_back(
+            Material {
+                .type = *type,
+                .albedo_map_texture_index = albedo_map_texture_index,
+                .ior = ior,
+            }
+        );
+        result.triangle_flags.emplace_back(TriangleFlags { .smooth_shading = smooth_shading_it->value.GetBool(), .back_face_culling = back_face_culling });
     }
 
-    return materials;
+    return result;
 }
 
 std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesystem::path &asset_root) {
@@ -550,11 +572,27 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
         bucket_size = it->value.GetInt();
     }
 
+    auto parsed_textures = [&]() -> ParsedTextures {
+        if (auto it = doc.FindMember("textures"); it != doc.MemberEnd()) {
+            if (auto res = get_textures_from_value(it->value, asset_root))
+                return std::move(*res);
+        }
+        return {};
+    }();
+
+    auto materials_it = doc.FindMember("materials");
+    if (materials_it == doc.MemberEnd())
+        return std::nullopt;
+
+    std::optional<ParsedMaterials> parsed_materials = get_materials_from_value(materials_it->value, parsed_textures);
+    if (!parsed_materials)
+        return std::nullopt;
+
     auto meshes_it = doc.FindMember("objects");
     if (meshes_it == doc.MemberEnd())
         return std::nullopt;
 
-    std::optional<ParsedMeshes> meshes = get_meshes_from_value(meshes_it->value);
+    std::optional<ParsedMeshes> meshes = get_meshes_from_value(meshes_it->value, parsed_materials->triangle_flags);
     if (!meshes)
         return std::nullopt;
 
@@ -566,22 +604,6 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
 
     std::optional<std::vector<Light>> lights = get_lights_from_value(lights_it->value);
     if (!lights)
-        return std::nullopt;
-
-    auto materials_it = doc.FindMember("materials");
-    if (materials_it == doc.MemberEnd())
-        return std::nullopt;
-
-	auto parsed_textures = [&]() -> ParsedTextures {
-	    if (auto it = doc.FindMember("textures"); it != doc.MemberEnd()) {
-	        if (auto res = get_textures_from_value(it->value, asset_root))
-	            return std::move(*res);
-	    }
-	    return {};
-	}();
-
-    std::optional<std::vector<Material>> materials = get_materials_from_value(materials_it->value, parsed_textures);
-    if (!materials)
         return std::nullopt;
 
     bool gi_on = false, reflections_on = true, refractions_on = true;
@@ -609,7 +631,7 @@ std::optional<Scene> read_scene_from_istream(std::istream &is, const std::filesy
         .acceleration_tree = std::move(acceleration_tree),
         .lights = std::move(*lights),
         .textures = std::move(parsed_textures.textures),
-        .materials = std::move(*materials),
+        .materials = std::move(parsed_materials->materials),
         .bucket_size = bucket_size,
         .gi_on = gi_on,
         .reflections_on = reflections_on,

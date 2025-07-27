@@ -36,7 +36,7 @@ static std::optional<Intersection> trace_ray_with_refractions(const Ray &ray, co
             const Material &material = scene.materials[closest_intersection->material_index];
             has_refracted = material.type == MaterialType::Refractive;
             if (has_refracted) {
-                has_refracted = r.refract_at(closest_intersection->point, closest_intersection->normal(material), material.ior, settings.refraction_bias);
+                has_refracted = r.refract_at(closest_intersection->point, closest_intersection->normal, material.ior, settings.refraction_bias);
             }
         }
     }
@@ -50,7 +50,7 @@ static Color shade_ray(const Ray &ray, const Scene &scene, const RendererSetting
     if (auto intersection = trace_ray(ray, scene)) {
         const Material &material = scene.materials[intersection->material_index];
         const Texture &albedo_map = scene.textures[material.albedo_map_texture_index];
-        Vector normal = intersection->normal(material);
+        Vector normal = intersection->normal;
 
         switch (material.type) {
             case MaterialType::Diffuse: {
@@ -79,8 +79,6 @@ static Color shade_ray(const Ray &ray, const Scene &scene, const RendererSetting
                     }
                 }
 
-                final_color /= settings.diffuse_reflection_ray_count + 1;
-
                 for (const auto &light : scene.lights) {
                     Vector light_dir = light.position - intersection->point;
                     float sphere_radius_squared = light_dir.length_squared();
@@ -97,6 +95,8 @@ static Color shade_ray(const Ray &ray, const Scene &scene, const RendererSetting
                         final_color += albedo_map.sample(intersection->uv, intersection->bary_u, intersection->bary_v) * light.intensity / sphere_area * cos_law;
                     }
                 }
+
+                final_color /= settings.diffuse_reflection_ray_count + 1;
 
                 return final_color;
             }

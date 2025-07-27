@@ -1,7 +1,5 @@
 #pragma once
 
-#include <string>
-
 namespace crt {
 
 enum class MaterialType {
@@ -15,7 +13,6 @@ struct Material {
     MaterialType type;
     int albedo_map_texture_index;
     float ior;
-    bool smooth_shading;
 };
 
 }

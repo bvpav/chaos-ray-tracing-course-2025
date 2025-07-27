@@ -24,7 +24,7 @@ struct Scene {
     std::vector<Texture> textures;
     std::vector<Material> materials;
     int bucket_size;
-    uint8_t gi_on : 1;
+    uint8_t gi_on          : 1;
     uint8_t reflections_on : 1 {1};
     uint8_t refractions_on : 1 {1};
 };
