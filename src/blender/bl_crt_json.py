@@ -68,7 +68,6 @@ def build_lights(scene: bpy.types.Scene) -> list[dict]:
                 'intensity': obj.data.energy,
                 'position': _convert_vector(obj.matrix_world.translation),
             })
-    # TODO: support other light types
     return lights
 
 
@@ -84,13 +83,17 @@ def build_materials() -> tuple[list[dict], dict]:
             continue
         mat_index_map[mat] = len(materials)
 
-        materials.append({
-            'type': 'diffuse',
-            'albedo': tuple(mat.diffuse_color[:3]),
+        material_dict = {
+            'type': mat.crt.type.lower(),
             'smooth_shading': mat.crt.smooth_shading,
             'back_face_culling': mat.use_backface_culling,
-        })
-        # TODO: detect reflective / refractive / constant materials
+        }
+        if mat.crt.type != 'REFRACTIVE':
+            material_dict['albedo'] = *mat.diffuse_color[:3],
+            print(material_dict['albedo'])
+        else:
+            material_dict['ior'] = mat.crt.ior
+        materials.append(material_dict)
 
     return materials, mat_index_map
 
@@ -132,6 +135,7 @@ def build_objects(depsgraph: bpy.types.Depsgraph, mat_index_map: dict) -> list[d
         # Material index
         slot = obj.material_slots[tri.material_index] if obj.material_slots else None
         mat = slot.material if slot else None
+        # HACK: If the object has no material, use the first (default) one
         material_index = mat_index_map.get(mat, 0)
 
         obj_dict = {

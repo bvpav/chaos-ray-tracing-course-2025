@@ -26,7 +26,7 @@ class CRT_RENDER_PT_settings(CRTButtonsPanel, bpy.types.Panel):
         layout.prop(crt_scene, 'bucket_size')
         layout.prop(crt_scene, 'gi_on')
         layout.prop(crt_scene, 'reflections_on')
-        layout.prop(crt_scene, 'refractcontext.ions_on')
+        layout.prop(crt_scene, 'refractions_on')
 
 
 class CRT_LIGHT_PT_light(CRTButtonsPanel, bpy.types.Panel):
@@ -91,7 +91,11 @@ class CRT_MATERIAL_PT_surface(CRTButtonsPanel, bpy.types.Panel):
         crt_mat = mat.crt
 
         layout.use_property_split = True
-        layout.prop(mat, 'diffuse_color', text='Albedo Color')
+        layout.prop(crt_mat, 'type')
+        if crt_mat.type != 'REFRACTIVE':
+            layout.prop(mat, 'diffuse_color', text='Albedo Color')
+        else:
+            layout.prop(crt_mat, 'ior')
         layout.prop(crt_mat, 'smooth_shading')
         layout.prop(mat, 'use_backface_culling')
     

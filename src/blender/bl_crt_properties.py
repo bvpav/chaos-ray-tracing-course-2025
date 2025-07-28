@@ -40,7 +40,17 @@ class CRTRenderSettings(bpy.types.PropertyGroup):
 
 
 class CRTMaterialProperties(bpy.types.PropertyGroup):
+    type: bpy.props.EnumProperty(
+        name='CRT Type',
+        items=[
+            ('DIFFUSE', 'Diffuse', '', 1),
+            ('REFLECTIVE', 'Reflective', '', 2),
+            ('REFRACTIVE', 'Refractive', '', 3),
+            ('CONSTANT', 'Constant', '', 4)
+        ]
+    )
     smooth_shading: bpy.props.BoolProperty(name='Smooth Shading', default=False)
+    ior: bpy.props.FloatProperty(name='IOR', default=1, min=0)
 
     @classmethod
     def register(cls):
@@ -52,7 +62,7 @@ class CRTMaterialProperties(bpy.types.PropertyGroup):
     
     @classmethod
     def unregister(cls):
-        del bpy.type.Material.crt
+        del bpy.types.Material.crt
     
 
 classes = (
