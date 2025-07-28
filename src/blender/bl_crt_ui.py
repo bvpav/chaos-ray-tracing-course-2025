@@ -88,9 +88,11 @@ class CRT_MATERIAL_PT_surface(CRTButtonsPanel, bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         mat = context.material
+        crt_mat = mat.crt
 
         layout.use_property_split = True
         layout.prop(mat, 'diffuse_color', text='Albedo Color')
+        layout.prop(crt_mat, 'smooth_shading')
         layout.prop(mat, 'use_backface_culling')
     
 

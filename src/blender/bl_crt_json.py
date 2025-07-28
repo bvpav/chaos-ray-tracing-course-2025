@@ -87,7 +87,7 @@ def build_materials() -> tuple[list[dict], dict]:
         materials.append({
             'type': 'diffuse',
             'albedo': tuple(mat.diffuse_color[:3]),
-            'smooth_shading': not mat.use_backface_culling,
+            'smooth_shading': mat.crt.smooth_shading,
             'back_face_culling': mat.use_backface_culling,
         })
         # TODO: detect reflective / refractive / constant materials

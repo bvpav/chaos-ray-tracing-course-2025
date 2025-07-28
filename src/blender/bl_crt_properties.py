@@ -30,16 +30,35 @@ class CRTRenderSettings(bpy.types.PropertyGroup):
     def register(cls):
         bpy.types.Scene.crt = bpy.props.PointerProperty(
             name='CRT Render Settings',
-            description='CRT render settings',
+            description='',
             type=cls,
         )
 
     @classmethod
     def unregister(cls):
         del bpy.types.Scene.crt
+
+
+class CRTMaterialProperties(bpy.types.PropertyGroup):
+    smooth_shading: bpy.props.BoolProperty(name='Smooth Shading', default=False)
+
+    @classmethod
+    def register(cls):
+        bpy.types.Material.crt = bpy.props.PointerProperty(
+            name='CRT Material Properties',
+            description='',
+            type=cls,
+        )
+    
+    @classmethod
+    def unregister(cls):
+        del bpy.type.Material.crt
     
 
-classes = (CRTRenderSettings,)
+classes = (
+    CRTRenderSettings,
+    CRTMaterialProperties,
+)
 
 
 def register():
