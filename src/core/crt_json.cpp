@@ -459,7 +459,7 @@ struct ParsedMaterials {
 };
 
 static std::optional<ParsedMaterials> get_materials_from_value(const rapidjson::Value &value, ParsedTextures &parsed_textures) {
-    if (!value.IsArray())
+    if (!value.IsArray() || value.Empty())
         return std::nullopt;
 
     ParsedMaterials result;

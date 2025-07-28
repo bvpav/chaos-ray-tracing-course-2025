@@ -3,6 +3,7 @@ if '_needs_reload' in locals():
     for _mod in (
         '_crt',
         'bl_crt_engine',
+        'bl_crt_json',
     ):
         try:
             _reload(locals()[_mod])
