@@ -1,24 +1,14 @@
+#include <Python.h>
+
+#include <experimental/scope>
+
 #include "core/crt_image.h"
 #include "core/crt_json.h"
 #include "core/crt_renderer.h"
 #include "core/crt_scene.h"
-#include <Python.h>
 
-#include <boolobject.h>
-#include <experimental/scope>
-
-#include <floatobject.h>
-#include <listobject.h>
-#include <modsupport.h>
-#include <object.h>
-#include <pyerrors.h>
-#include <pyport.h>
-#include <pytypedefs.h>
-#include <string>
-#include <tupleobject.h>
-
-constexpr int MAX_RAY_DEPTH = 5;
-constexpr int DIFFUSE_REFLECTION_RAY_COUNT = 3;
+constexpr int MAX_RAY_DEPTH = 3;
+constexpr int DIFFUSE_REFLECTION_RAY_COUNT = 4;
 
 constexpr float SHADOW_BIAS = 1e-2f;
 constexpr float REFLECTION_BIAS = 1e-2f;
@@ -54,7 +44,7 @@ static PyObject *render_scene_from_dict([[maybe_unused]] PyObject *self, PyObjec
             return nullptr;
     }
 
-    scope_exit kwargs_guard{ [&](){ Py_DECREF(json_unicode); }};
+    scope_exit json_unicode_guard{ [&](){ Py_DECREF(json_unicode); }};
 
     Py_ssize_t json_utf8_size;
     const char *json_utf8_bytes = PyUnicode_AsUTF8AndSize(json_unicode, &json_utf8_size);

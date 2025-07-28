@@ -20,7 +20,7 @@ _rh_to_blender_conversion = axis_conversion(
 
 
 def _convert_matrix(mat: Matrix) -> list[float]:
-    return [v for row in mat.to_3x3() for v in row]
+    return [v for row in mat.to_3x3().transposed() for v in row]
 
 
 def _convert_vector(vec: Vector) -> list[float]:
@@ -149,7 +149,6 @@ def build_materials() -> tuple[list[dict], dict]:
                 material_dict['albedo'] = *mat.diffuse_color[:3],
             else:
                 material_dict['albedo'] = tex.name
-            print(material_dict['albedo'])
         else:
             material_dict['ior'] = mat.crt.ior
         materials.append(material_dict)
@@ -318,7 +317,7 @@ def load_camera(scene: bpy.types.Scene, camera: dict) -> None:
         [m[3], m[4], m[5]],
         [m[6], m[7], m[8]],
     ])
-    mat4 = mat3.to_4x4()
+    mat4 = mat3.transposed().to_4x4()
     cam_obj.matrix_world = _rh_to_blender_conversion @ mat4
 
 
