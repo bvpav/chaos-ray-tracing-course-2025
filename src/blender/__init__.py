@@ -12,17 +12,21 @@ def register():
     from . import bl_crt_engine
     from . import bl_crt_properties
     from . import bl_crt_ui
+    from . import bl_crt_ops
 
     bl_crt_properties.register()
     bl_crt_engine.register()
     bl_crt_ui.register()
+    bl_crt_ops.register()
 
 
 def unregister():
     from . import bl_crt_engine
     from . import bl_crt_properties
     from . import bl_crt_ui
+    from . import bl_crt_ops
 
+    bl_crt_ops.unregister()
     bl_crt_engine.unregister()
     bl_crt_ui.unregister()
     bl_crt_properties.unregister()

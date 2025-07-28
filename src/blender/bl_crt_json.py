@@ -10,7 +10,7 @@ from bpy_extras.io_utils import axis_conversion
 
 _blender_to_rh_conversion = axis_conversion(
     from_forward='-Y', from_up='Z',
-    to_forward='Z',    to_up='Y'
+    to_forward='Z', to_up='Y'
 ).to_4x4()
 
 _rh_to_blender_conversion = axis_conversion(
@@ -224,3 +224,179 @@ def build_scene_dict(depsgraph: bpy.types.Depsgraph) -> dict:
         'materials': materials,
         'objects': build_objects(depsgraph, mat_index_map),
     }
+
+
+def _load_image(filepath: str) -> bpy.types.Image:
+    """Return an existing image or load a new one."""
+    filepath = os.path.normpath(filepath)
+    for img in bpy.data.images:
+        if os.path.normpath(bpy.path.abspath(img.filepath)) == filepath:
+            return img
+    return bpy.data.images.load(filepath)
+
+
+def _ensure_texture(name: str) -> bpy.types.Texture:
+    """Return existing texture or create a new one."""
+    tex = bpy.data.textures.get(name)
+    if tex is None:
+        tex = bpy.data.textures.new(name, 'IMAGE')
+    return tex
+
+
+def _ensure_material(name: str) -> bpy.types.Material:
+    """Return existing material or create a new one."""
+    mat = bpy.data.materials.get(name)
+    if mat is None:
+        mat = bpy.data.materials.new(name)
+    return mat
+
+
+def _ensure_object(name: str, mesh: bpy.types.Mesh) -> bpy.types.Object:
+    """Return existing object or create a new one."""
+    obj = bpy.data.objects.get(name)
+    if obj is None:
+        obj = bpy.data.objects.new(name, mesh)
+    else:
+        obj.data = mesh
+    return obj
+
+
+def load_textures(textures: list[dict]) -> None:
+    for t in textures:
+        tex = _ensure_texture(t['name'])
+        tex.type = 'IMAGE'
+        tex.crt.type = t['type'].upper()
+
+        if t['type'] == 'ALBEDO':
+            tex.crt.albedo_color = t['albedo']
+        elif t['type'] == 'EDGES':
+            tex.crt.edge_color = t['edge_color']
+            tex.crt.inner_color = t['inner_color']
+            tex.crt.edge_width = t['edge_width']
+        elif t['type'] == 'CHECKER':
+            tex.crt.checker_color_a = t['color_A']
+            tex.crt.checker_color_b = t['color_B']
+            tex.crt.square_size = t['square_size']
+        elif t['type'] == 'BITMAP':
+            img = _load_image(t['file_path'])
+            tex.image = img
+
+
+def load_settings(scene: bpy.types.Scene, settings: dict) -> None:
+    s = settings
+    scene.world.color = s['background_color']
+    if 'bucket_size' in s['image_settings']:
+        scene.crt.bucket_size = s['image_settings']['bucket_size']
+    if 'gi_on' in s:
+        scene.crt.gi_on = s['gi_on']
+    if 'reflections_on' in s:
+        scene.crt.reflections_on = s['reflections_on']
+    if 'refractions_on' in s:
+        scene.crt.refractions_on = s['refractions_on']
+
+    scene.render.resolution_x = s['image_settings']['width']
+    scene.render.resolution_y = s['image_settings']['height']
+    scene.render.resolution_percentage = 100
+
+
+def load_camera(scene: bpy.types.Scene, camera: dict) -> None:
+    cam_obj = scene.camera
+    if cam_obj is None:
+        cam_data = bpy.data.cameras.new('Camera')
+        cam_obj = bpy.data.objects.new('Camera', cam_data)
+        scene.collection.objects.link(cam_obj)
+        scene.camera = cam_obj
+    else:
+        cam_data = cam_obj.data
+
+    cam_data.angle = math.radians(camera['fov_degrees'])
+
+    # Build 3x3 matrix from flat list
+    m = camera['matrix']
+    mat3 = Matrix([
+        [m[0], m[1], m[2]],
+        [m[3], m[4], m[5]],
+        [m[6], m[7], m[8]],
+    ])
+    mat4 = mat3.to_4x4()
+    cam_obj.matrix_world = _rh_to_blender_conversion @ mat4
+
+
+def load_lights(scene: bpy.types.Scene, lights: list[dict]) -> None:
+    existing = {obj for obj in scene.objects if obj.type == 'LIGHT'}
+    for i, l in enumerate(lights):
+        name = f'Light_{i}'
+        light_data = bpy.data.lights.new(name, 'POINT')
+        light_obj = bpy.data.objects.new(name, light_data)
+        scene.collection.objects.link(light_obj)
+        light_obj.location = _rh_to_blender_conversion @ Vector(l['position'])
+        light_data.energy = l['intensity']
+    for obj in existing:
+        bpy.data.objects.remove(obj, do_unlink=True)
+
+
+def load_materials(materials: list[dict]) -> dict:
+    mat_index_map = {}
+    for i, m in enumerate(materials):
+        mat = _ensure_material(f'Material_{i}')
+        mat_index_map[i] = mat
+        mat.crt.type = m['type'].upper()
+        mat.crt.smooth_shading = m['smooth_shading']
+        mat.use_backface_culling = m.get('back_face_culling', False)
+
+        if m['type'] != 'refractive':
+            if isinstance(m['albedo'], str):
+                tex = bpy.data.textures.get(m['albedo'])
+                mat.crt.albedo_texture = tex
+            else:
+                mat.diffuse_color = (*m['albedo'], 1.0)
+                mat.crt.albedo_texture = None
+        else:
+            mat.crt.ior = m.get('ior', 1.0)
+    return mat_index_map
+
+
+def load_objects(objects: list[dict], mat_index_map: dict) -> None:
+    scene = bpy.context.scene
+    existing = {obj for obj in bpy.data.objects if obj.type == 'MESH'}
+    for i, o in enumerate(objects):
+        mesh = bpy.data.meshes.new(f'Mesh_{i}')
+        mesh.vertices.add(len(o['vertices']) // 3)
+        mesh.vertices.foreach_set('co', o['vertices'])
+        mesh.loops.add(len(o['triangles']))
+        mesh.loops.foreach_set('vertex_index', o['triangles'])
+        mesh.polygons.add(len(o['triangles']) // 3)
+        mesh.polygons.foreach_set('loop_start', range(0, len(o['triangles']), 3))
+        mesh.polygons.foreach_set('loop_total', [3] * (len(o['triangles']) // 3))
+        mesh.update(calc_edges=True)
+
+        # Convert vertex positions from RH to Blender
+        for v in mesh.vertices:
+            v.co = _rh_to_blender_conversion @ Vector(v.co)
+
+        if 'uvs' in o:
+            uv_layer = mesh.uv_layers.new()
+            uvs = o['uvs']
+            for loop in mesh.loops:
+                vid = loop.vertex_index
+                uv_layer.data[loop.index].uv = (uvs[vid * 3], uvs[vid * 3 + 1])
+
+        obj = _ensure_object(f'Object_{i}', mesh)
+        if obj.name not in bpy.context.scene.collection.objects:
+            bpy.context.scene.collection.objects.link(obj)
+        obj.data.materials.clear()
+        obj.data.materials.append(mat_index_map[o['material_index']])
+
+    for obj in existing:
+        bpy.data.objects.remove(obj, do_unlink=True)
+
+
+def load_scene_dict(scene_dict: dict) -> None:
+    scene = bpy.context.scene
+    load_settings(scene, scene_dict['settings'])
+    load_camera(scene, scene_dict['camera'])
+    load_lights(scene, scene_dict['lights'])
+    if 'textures' in scene_dict:
+        load_textures(scene_dict['textures'])
+    mat_index_map = load_materials(scene_dict['materials'])
+    load_objects(scene_dict['objects'], mat_index_map)
