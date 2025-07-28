@@ -117,5 +117,15 @@ static PyModuleDef module{
 
 
 PyMODINIT_FUNC PyInit__crt() {
-    return PyModule_Create(&module);
+    PyObject *module_obj = PyModule_Create(&module);
+    if (!module_obj)
+        return nullptr;
+
+    if (PyModule_AddIntConstant(module_obj, "DEFAULT_SCENE_BUCKET_SIZE", crt::DEFAULT_SCENE_BUCKET_SIZE) < 0)
+        goto error;
+
+    return module_obj;
+error:
+    Py_DECREF(module_obj);
+    return nullptr;
 }

@@ -27,17 +27,21 @@ def _convert_vector(vec: Vector) -> list[float]:
     return [v.x, v.y, v.z]
 
 
-def build_settings() -> dict:
+def build_settings(scene: bpy.types.Scene) -> dict:
+    scale = scene.render.resolution_percentage / 100.0
+    width = int(scene.render.resolution_x * scale)
+    height = int(scene.render.resolution_y * scale)
+
     return {
-        'background_color': [0, 0, 0],
+        'background_color': tuple(scene.world.color),
         'image_settings': {
-            'width': 1080,
-            'height': 1080,
-            'bucket_size': 24,
+            'width': width,
+            'height': height,
+            'bucket_size': scene.crt.bucket_size,
         },
-        'gi_on': True,
-        'reflections_on': True,
-        'refractions_on': True,
+        'gi_on': scene.crt.gi_on,
+        'reflections_on': scene.crt.reflections_on,
+        'refractions_on': scene.crt.refractions_on,
     }
 
 
@@ -52,7 +56,7 @@ def build_camera(scene: bpy.types.Scene) -> dict:
     return {
         'matrix': _convert_matrix(cam_matrix_rh),
         'position': _convert_vector(cam_obj.matrix_world.translation),
-        'fov_degrees': math.degrees(cam.angle_x),
+        'fov_degrees': math.degrees(cam.angle),
     }
 
 
@@ -73,7 +77,7 @@ def build_materials() -> tuple[list[dict], dict]:
     mat_index_map = {}
 
     if not bpy.data.materials:
-        raise ValueError("Blender file must have at least 1 material")
+        raise ValueError('Blender file must have at least 1 material')
 
     for mat in bpy.data.materials:
         if mat.users == 0:
@@ -82,7 +86,7 @@ def build_materials() -> tuple[list[dict], dict]:
 
         materials.append({
             'type': 'diffuse',
-            'albedo': list(mat.diffuse_color[:3]),
+            'albedo': tuple(mat.diffuse_color[:3]),
             'smooth_shading': not mat.use_backface_culling,
             'back_face_culling': mat.use_backface_culling,
         })
@@ -103,11 +107,22 @@ def build_objects(depsgraph: bpy.types.Depsgraph, mat_index_map: dict) -> list[d
         if not mesh.loop_triangles:
             mesh.calc_loop_triangles()
 
+        vertex_uv = {}
+        if mesh.uv_layers.active:
+            uv_layer = mesh.uv_layers.active.data
+            for loop in mesh.loops:
+                vid = loop.vertex_index
+                if vid not in vertex_uv:
+                    uv = uv_layer[loop.index].uv
+                    vertex_uv[vid] = [uv.x, uv.y, 0.0]
+
         # Vertices
         vertices = []
+        uvs = []
         for v in mesh.vertices:
             pos = eval_obj.matrix_world @ v.co
             vertices.extend(_convert_vector(pos))
+            uvs.extend(vertex_uv.get(v.index, [0.0, 0.0, 0.0]))
 
         # Triangles
         triangles = []
@@ -119,11 +134,16 @@ def build_objects(depsgraph: bpy.types.Depsgraph, mat_index_map: dict) -> list[d
         mat = slot.material if slot else None
         material_index = mat_index_map.get(mat, 0)
 
-        objects.append({
+        obj_dict = {
             'material_index': material_index,
             'vertices': vertices,
             'triangles': triangles,
-        })
+        }
+
+        if mesh.uv_layers.active:
+            obj_dict['uvs'] = uvs
+
+        objects.append(obj_dict)
 
         eval_obj.to_mesh_clear()
 
@@ -134,7 +154,7 @@ def build_scene_dict(depsgraph: bpy.types.Depsgraph) -> dict:
     materials, mat_index_map = build_materials()
 
     return {
-        'settings': build_settings(),
+        'settings': build_settings(depsgraph.scene),
         'camera': build_camera(depsgraph.scene),
         'lights': build_lights(depsgraph.scene),
         'materials': materials,

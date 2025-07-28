@@ -1,25 +1,28 @@
 if '_needs_reload' in locals():
-    from importlib import reload as _reload
-    for _mod in (
-        '_crt',
-        'bl_crt_engine',
-        'bl_crt_json',
-    ):
-        try:
-            _reload(locals()[_mod])
-        except KeyError:
-            pass
+    import importlib as _importlib
+    import sys as _sys
+    for _name in list(_sys.modules):
+        if _name.startswith(__package__ + '.'):
+            _importlib.reload(_sys.modules[_name])
 
 _needs_reload = True
 
 
 def register():
     from . import bl_crt_engine
+    from . import bl_crt_properties
+    from . import bl_crt_ui
 
+    bl_crt_properties.register()
     bl_crt_engine.register()
+    bl_crt_ui.register()
 
 
 def unregister():
     from . import bl_crt_engine
+    from . import bl_crt_properties
+    from . import bl_crt_ui
 
     bl_crt_engine.unregister()
+    bl_crt_ui.unregister()
+    bl_crt_properties.unregister()
