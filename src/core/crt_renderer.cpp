@@ -73,7 +73,6 @@ static Color shade_ray(const Ray &ray, const Scene &scene, const RendererSetting
                         direction *= rotation;
                         direction *= local_hit_matrix;
 
-                        // TODO: maybe enable diffuse reflections to have an independent bias?
                         Ray diffuse_reflection_ray{ intersection->point + normal * settings.diffuse_reflection_bias, direction, ray.depth + 1 };
                         final_color += shade_ray(diffuse_reflection_ray, scene, settings, rng);
                     }
@@ -139,8 +138,7 @@ static Color shade_ray(const Ray &ray, const Scene &scene, const RendererSetting
                 return albedo_map.sample(intersection->uv, intersection->bary_u, intersection->bary_v);
             }
         }
-        // std::unreachable() // FIXME: Use C++23 maybe?
-        assert(false);
+        std::unreachable();
     } else {
         return scene.background_color;
     }

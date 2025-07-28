@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <utility>
 
 namespace crt {
 
@@ -44,8 +45,7 @@ const Color &Texture::sample(const Vector &uv, float bary_u, float bary_v) const
         }
     }
 
-    // std::unreachable() // FIXME: Use C++23 maybe?
-    assert(false);
+    std::unreachable();
 }
 
 }

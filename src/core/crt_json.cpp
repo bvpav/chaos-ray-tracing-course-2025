@@ -446,8 +446,7 @@ static std::optional<ParsedTextures> get_textures_from_value(const rapidjson::Va
                 continue;
             }
         }
-        // std::unreachable() // FIXME: Use C++23 maybe?
-        assert(false);
+        std::unreachable();
     }
 
     return result;
