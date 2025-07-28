@@ -32,7 +32,7 @@ add_executable(${PROJECT_NAME} ${CRT_STANDALONE_SOURCES})
 target_link_libraries(${PROJECT_NAME} PRIVATE crt_core)
 
 find_package(Python3 3.11 EXACT REQUIRED
-    COMPONENTS Development.Module)
+    COMPONENTS Interpreter Development.Module)
 
 file(GLOB_RECURSE CRT_PYTHON_SOURCES
     "src/python/*.cpp"
@@ -42,3 +42,26 @@ file(GLOB_RECURSE CRT_PYTHON_SOURCES
 Python3_add_library(_crt MODULE WITH_SOABI ${CRT_PYTHON_SOURCES})
 
 target_link_libraries(_crt PRIVATE crt_core)
+
+add_custom_target(crt_blender_extension ALL
+    DEPENDS _crt
+    COMMENT "Creating Blender extension package"
+)
+
+set(CRT_MODULE_FILE "$<TARGET_FILE:_crt>")
+
+set(CRT_BLENDER_EXTENSION_STAGING_DIR "${CMAKE_CURRENT_BINARY_DIR}/blender_extension")
+set(CRT_BLENDER_EXTENSION_ZIP "${CMAKE_CURRENT_BINARY_DIR}/crt_blender_extension.zip")
+
+add_custom_command(
+    TARGET crt_blender_extension
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CRT_BLENDER_EXTENSION_STAGING_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/src/blender ${CRT_BLENDER_EXTENSION_STAGING_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy ${CRT_MODULE_FILE} ${CRT_BLENDER_EXTENSION_STAGING_DIR}
+    
+    # Create zip using Python (which is already a requirement)
+    COMMAND ${Python3_EXECUTABLE} -c "import zipfile, os; zip_file = zipfile.ZipFile('${CRT_BLENDER_EXTENSION_ZIP}', 'w'); [zip_file.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), '${CRT_BLENDER_EXTENSION_STAGING_DIR}')) for root, _, files in os.walk('${CRT_BLENDER_EXTENSION_STAGING_DIR}') for file in files]; zip_file.close()"
+    
+    COMMENT "Creating Blender extension package"
+    VERBATIM
+)
