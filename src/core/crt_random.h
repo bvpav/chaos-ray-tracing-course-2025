@@ -10,7 +10,7 @@ namespace crt {
 struct PCG32 {
     uint64_t state, inc;
 
-    uint32_t operator()() {
+    constexpr uint32_t operator()() {
         uint64_t old = state;
         state = old * UINT64_C(6364136223846793005) + inc;
         uint32_t xorshifted = ((old >> UINT32_C(18)) ^ old) >> UINT32_C(27);
@@ -18,7 +18,7 @@ struct PCG32 {
         return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
     }
 
-    float uniform() {
+    constexpr float uniform() {
         union { uint32_t i; float f; } u;
         // Shift 23 random bits into the mantissa.
         // Make the exponent 127 (a.k.a. 2^0), so it's 1.0.

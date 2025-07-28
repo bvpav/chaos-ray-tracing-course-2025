@@ -1,0 +1,14 @@
+schema_version = "1.0.0"
+
+id = "crt_renderer"
+version = "0.0.1"
+name = "CRT Renderer"
+tagline = "Rendering engine based on the Chaos Ray Tracing Course 2025"
+maintainer = "bvpav"
+type = "add-on"
+
+blender_version_min = "4.2.0"
+
+license = ["GPL-3.0-or-later"]
+
+

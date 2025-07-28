@@ -12,6 +12,9 @@ file(GLOB_RECURSE CRT_CORE_SOURCES
 )
 add_library(crt_core STATIC ${CRT_CORE_SOURCES})
 
+# Required by Python
+set_property(TARGET crt_core PROPERTY POSITION_INDEPENDENT_CODE ON)
+
 target_include_directories(crt_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
@@ -27,3 +30,15 @@ file(GLOB_RECURSE CRT_STANDALONE_SOURCES
 add_executable(${PROJECT_NAME} ${CRT_STANDALONE_SOURCES})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE crt_core)
+
+find_package(Python3 3.11 EXACT REQUIRED
+    COMPONENTS Development.Module)
+
+file(GLOB_RECURSE CRT_PYTHON_SOURCES
+    "src/python/*.cpp"
+    "src/python/*.h"
+)
+
+Python3_add_library(_crt MODULE WITH_SOABI ${CRT_PYTHON_SOURCES})
+
+target_link_libraries(_crt PRIVATE crt_core)
