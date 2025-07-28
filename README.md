@@ -10,9 +10,6 @@ This repository contains my solutions to the assignments of the [Chaos Ray Traci
 
 2. For convenience there’s also a simple cross-platform `make` wrapper - just run:
 
-> [!NOTE]
-> This is inspired by [Blender](https://developer.blender.org/docs/handbook/building_blender/#make-wrapper)
-
 ```sh
 make standalone   # build standalone executable
 make python       # build Python extension module (_crt)
@@ -28,7 +25,7 @@ The **standalone executable** takes 2 positional arguments:
 crt_renderer [<scene-file>] [<output-file>]
 ```
 
-The **Blender extension** is tested only on _Blender 4.5_, which comes with _Python 3.11_.
+The **Blender extension** is tested only on _Blender 4.5_, which comes with _Python 3.11_. The Python development libraries must be available on the system in order to build the extension.
 
 The build process packages a ZIP archive, which you can install from **Edit > Preferences > Extensions > Extension Settings (chevron on top right) > Install from Disk**.
 
