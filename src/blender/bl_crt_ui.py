@@ -28,6 +28,15 @@ class CRT_RENDER_PT_settings(CRTButtonsPanel, bpy.types.Panel):
         layout.prop(crt_scene, 'reflections_on')
         layout.prop(crt_scene, 'refractions_on')
 
+        layout.separator()
+
+        layout.prop(crt_scene, 'max_ray_depth')
+        layout.prop(crt_scene, 'diffuse_reflection_ray_count')
+        layout.prop(crt_scene, 'shadow_bias')
+        layout.prop(crt_scene, 'reflection_bias')
+        layout.prop(crt_scene, 'diffuse_reflection_bias')
+        layout.prop(crt_scene, 'refraction_bias')
+
 
 class CRT_LIGHT_PT_light(CRTButtonsPanel, bpy.types.Panel):
     bl_label = 'CRT Light'

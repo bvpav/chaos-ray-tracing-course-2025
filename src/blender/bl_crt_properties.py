@@ -3,7 +3,7 @@ import bpy
 from . import _crt
 
 
-class CRTRenderSettings(bpy.types.PropertyGroup):
+class CRTRendererSettings(bpy.types.PropertyGroup):
     bucket_size: bpy.props.IntProperty(
         name='Bucket Size',
         default=_crt.DEFAULT_SCENE_BUCKET_SIZE,
@@ -24,6 +24,36 @@ class CRTRenderSettings(bpy.types.PropertyGroup):
         name='Refractions',
         default=True,
         description=''
+    )
+    max_ray_depth: bpy.props.IntProperty(
+        name='Max Ray Depth',
+        default=_crt.DEFAULT_MAX_RAY_DEPTH,
+        min=0
+    )
+    diffuse_reflection_ray_count: bpy.props.IntProperty(
+        name='Diffuse Reflection Ray Count',
+        default=_crt.DEFAULT_DIFFUSE_REFLECTION_RAY_COUNT,
+        min=0
+    )
+    shadow_bias: bpy.props.FloatProperty(
+        name='Shadow Bias',
+        default=_crt.DEFAULT_SHADOW_BIAS,
+        min=0
+    )
+    reflection_bias: bpy.props.FloatProperty(
+        name='Reflection Bias',
+        default=_crt.DEFAULT_REFLECTION_BIAS,
+        min=0
+    )
+    diffuse_reflection_bias: bpy.props.FloatProperty(
+        name='Diffuse Reflection Bias',
+        default=_crt.DEFAULT_DIFFUSE_REFLECTION_BIAS,
+        min=0
+    )
+    refraction_bias: bpy.props.FloatProperty(
+        name='Refraction Bias',
+        default=_crt.DEFAULT_REFRACTION_BIAS,
+        min=0
     )
 
     @classmethod
@@ -101,7 +131,7 @@ class CRTTextureProperties(bpy.types.PropertyGroup):
     
 
 classes = (
-    CRTRenderSettings,
+    CRTRendererSettings,
     CRTMaterialProperties,
     CRTTextureProperties,
 )

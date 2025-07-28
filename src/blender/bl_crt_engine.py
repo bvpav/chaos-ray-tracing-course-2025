@@ -16,9 +16,18 @@ class CRTRenderEngine(bpy.types.RenderEngine):
         scene_dict = build_scene_dict(depsgraph)
         image_settings = scene_dict['settings']['image_settings']
 
+        renderer_settings = _crt.RendererSettings((
+            depsgraph.scene.crt.max_ray_depth,
+            depsgraph.scene.crt.diffuse_reflection_ray_count,
+            depsgraph.scene.crt.shadow_bias,
+            depsgraph.scene.crt.reflection_bias,
+            depsgraph.scene.crt.diffuse_reflection_bias,
+            depsgraph.scene.crt.refraction_bias,
+        ))
+
         result = self.begin_result(0, 0, image_settings['width'], image_settings['height'])
         layer = result.layers[0].passes['Combined']
-        layer.rect = _crt.render_scene_from_dict(scene_dict, '/')  # Make sure assets are relative to system root
+        layer.rect = _crt.render_scene_from_dict(scene_dict, '/', renderer_settings)  # Make sure assets are relative to system root
         self.end_result(result)
 
 

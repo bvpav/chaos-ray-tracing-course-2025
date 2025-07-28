@@ -1,25 +1,56 @@
 #include <Python.h>
 
 #include <experimental/scope>
+#include <modsupport.h>
+#include <moduleobject.h>
+#include <object.h>
+#include <structseq.h>
 
 #include "core/crt_image.h"
 #include "core/crt_json.h"
 #include "core/crt_renderer.h"
 #include "core/crt_scene.h"
 
-constexpr int MAX_RAY_DEPTH = 3;
-constexpr int DIFFUSE_REFLECTION_RAY_COUNT = 4;
-
-constexpr float SHADOW_BIAS = 1e-2f;
-constexpr float REFLECTION_BIAS = 1e-2f;
-constexpr float DIFFUSE_REFLECTION_BIAS = 1e-2f;
-constexpr float REFRACTION_BIAS = 1e-2f;
-
 using std::experimental::scope_exit;
 
+static PyStructSequence_Field fields[]{
+    { "max_ray_depth",                "Maximum recursion depth for rays" },
+    { "diffuse_reflection_ray_count", "Number of rays for diffuse reflections" },
+    { "shadow_bias",                  "Epsilon used for shadow acne avoidance" },
+    { "reflection_bias",              "Epsilon used for reflection acne avoidance" },
+    { "diffuse_reflection_bias",      "Epsilon used for diffuse reflection acne avoidance" },
+    { "refraction_bias",              "Epsilon used for refraction acne avoidance" },
+    { nullptr }
+};
+
+static PyStructSequence_Desc renderer_settings_desc = {
+    .name = "_crt.RendererSettings",
+    .doc = "Renderer settings used by crt_core",
+    .fields = fields,
+    .n_in_sequence = 6
+};
+
+static PyTypeObject *RendererSettingsType = nullptr;
+
+bool get_renderer_settings(PyObject *obj, crt::RendererSettings &result) {
+    if (!PyObject_TypeCheck(obj, RendererSettingsType)) {
+        PyErr_SetString(PyExc_TypeError, "Expected a RendererSettings instance");
+        return false;
+    }
+
+    result.max_ray_depth = PyLong_AsUnsignedLong(PyStructSequence_GET_ITEM(obj, 0));
+    result.diffuse_reflection_ray_count = PyLong_AsUnsignedLong(PyStructSequence_GET_ITEM(obj, 1));
+    result.shadow_bias = static_cast<float>(PyFloat_AsDouble(PyStructSequence_GET_ITEM(obj, 2)));
+    result.reflection_bias = static_cast<float>(PyFloat_AsDouble(PyStructSequence_GET_ITEM(obj, 3)));
+    result.diffuse_reflection_bias = static_cast<float>(PyFloat_AsDouble(PyStructSequence_GET_ITEM(obj, 4)));
+    result.refraction_bias = static_cast<float>(PyFloat_AsDouble(PyStructSequence_GET_ITEM(obj, 5)));
+
+    return !PyErr_Occurred();
+}
+
 static PyObject *render_scene_from_dict([[maybe_unused]] PyObject *self, PyObject *args) {
-    PyObject *dict_obj, *asset_root_unicode;
-    if (!PyArg_ParseTuple(args, "O!U", &PyDict_Type, &dict_obj, &asset_root_unicode)) 
+    PyObject *dict_obj, *asset_root_unicode, *renderer_settings_obj;
+    if (!PyArg_ParseTuple(args, "O!UO", &PyDict_Type, &dict_obj, &asset_root_unicode, &renderer_settings_obj)) 
         return nullptr;
 
     PyObject *json_unicode;
@@ -62,16 +93,11 @@ static PyObject *render_scene_from_dict([[maybe_unused]] PyObject *self, PyObjec
         return nullptr;
     }
 
-    crt::RendererSettings settings{
-        .max_ray_depth = MAX_RAY_DEPTH,
-        .diffuse_reflection_ray_count = DIFFUSE_REFLECTION_RAY_COUNT,
-        .shadow_bias = SHADOW_BIAS,
-        .reflection_bias = REFLECTION_BIAS,
-        .diffuse_reflection_bias = DIFFUSE_REFLECTION_BIAS,
-        .refraction_bias = REFRACTION_BIAS,
-    };
+    crt::RendererSettings renderer_settings;
+    if (!get_renderer_settings(renderer_settings_obj, renderer_settings))
+        return nullptr;
 
-    crt::Image image = crt::render_image(*scene, settings);
+    crt::Image image = crt::render_image(*scene, renderer_settings);
 
     PyObject *output_buffer = PyList_New(image.width * image.height);
     if (!output_buffer)
@@ -111,11 +137,33 @@ PyMODINIT_FUNC PyInit__crt() {
     if (!module_obj)
         return nullptr;
 
-    if (PyModule_AddIntConstant(module_obj, "DEFAULT_SCENE_BUCKET_SIZE", crt::DEFAULT_SCENE_BUCKET_SIZE) < 0)
-        goto error;
+    scope_exit module_guard{ [&](){ Py_DECREF(module_obj); } };
 
+    if (PyModule_AddIntConstant(module_obj, "DEFAULT_SCENE_BUCKET_SIZE", crt::DEFAULT_SCENE_BUCKET_SIZE) < 0)
+        return nullptr;
+
+    if (PyModule_AddIntConstant(module_obj, "DEFAULT_MAX_RAY_DEPTH", crt::DEFAULT_MAX_RAY_DEPTH) < 0)
+        return nullptr;
+
+    if (PyModule_AddIntConstant(module_obj, "DEFAULT_DIFFUSE_REFLECTION_RAY_COUNT", crt::DEFAULT_DIFFUSE_REFLECTION_RAY_COUNT) < 0)
+        return nullptr;
+    if (PyModule_AddObject(module_obj, "DEFAULT_SHADOW_BIAS", PyFloat_FromDouble(crt::DEFAULT_SHADOW_BIAS)) < 0)
+        return nullptr;
+    if (PyModule_AddObject(module_obj, "DEFAULT_REFLECTION_BIAS", PyFloat_FromDouble(crt::DEFAULT_REFLECTION_BIAS)) < 0)
+        return nullptr;
+    if (PyModule_AddObject(module_obj, "DEFAULT_DIFFUSE_REFLECTION_BIAS", PyFloat_FromDouble(crt::DEFAULT_DIFFUSE_REFLECTION_BIAS)) < 0)
+        return nullptr;
+    if (PyModule_AddObject(module_obj, "DEFAULT_REFRACTION_BIAS", PyFloat_FromDouble(crt::DEFAULT_REFRACTION_BIAS)) < 0)
+        return nullptr;
+
+    RendererSettingsType = PyStructSequence_NewType(&renderer_settings_desc);
+    if (!RendererSettingsType)
+        return nullptr;
+
+    Py_INCREF(RendererSettingsType);
+    if (PyModule_AddObject(module_obj, "RendererSettings", (PyObject *)RendererSettingsType) < 0)
+        return nullptr;
+
+    module_guard.release();
     return module_obj;
-error:
-    Py_DECREF(module_obj);
-    return nullptr;
 }

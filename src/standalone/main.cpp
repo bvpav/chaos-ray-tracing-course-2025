@@ -8,18 +8,6 @@
 #include "core/crt_renderer.h"
 #include "core/crt_scene.h"
 
-// TODO: move to configuration
-
-static constexpr int MAX_COLOR_COMPONENT = 0xFF;
-
-constexpr int MAX_RAY_DEPTH = 5;
-constexpr int DIFFUSE_REFLECTION_RAY_COUNT = 3;
-
-constexpr float SHADOW_BIAS = 1e-2f;
-constexpr float REFLECTION_BIAS = 1e-2f;
-constexpr float DIFFUSE_REFLECTION_BIAS = 1e-2f;
-constexpr float REFRACTION_BIAS = 1e-2f;
-
 int main(int argc, char *argv[]) {
     using namespace std::chrono;
 
@@ -44,14 +32,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    crt::RendererSettings settings{
-        .max_ray_depth = MAX_RAY_DEPTH,
-        .diffuse_reflection_ray_count = DIFFUSE_REFLECTION_RAY_COUNT,
-        .shadow_bias = SHADOW_BIAS,
-        .reflection_bias = REFLECTION_BIAS,
-        .diffuse_reflection_bias = DIFFUSE_REFLECTION_BIAS,
-        .refraction_bias = REFRACTION_BIAS,
-    };
+    crt::RendererSettings settings;
 
     high_resolution_clock::time_point start = high_resolution_clock::now();
     crt::Image image = crt::render_image(*scene, settings);
