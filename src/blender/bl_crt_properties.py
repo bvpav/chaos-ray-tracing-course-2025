@@ -51,6 +51,7 @@ class CRTMaterialProperties(bpy.types.PropertyGroup):
     )
     smooth_shading: bpy.props.BoolProperty(name='Smooth Shading', default=False)
     ior: bpy.props.FloatProperty(name='IOR', default=1, min=0)
+    albedo_texture: bpy.props.PointerProperty(type=bpy.types.Texture, name='Albedo Texture')
 
     @classmethod
     def register(cls):
@@ -63,11 +64,46 @@ class CRTMaterialProperties(bpy.types.PropertyGroup):
     @classmethod
     def unregister(cls):
         del bpy.types.Material.crt
+
+
+class CRTTextureProperties(bpy.types.PropertyGroup):
+    type: bpy.props.EnumProperty(
+        name='CRT Type',
+        items=[
+            ('ALBEDO', 'Albedo', '', 1),
+            ('EDGES', 'Edges', '', 2),
+            ('CHECKER', 'Checker', '', 3),
+            ('BITMAP', 'Bitmap', '', 4),
+        ]
+    )
+
+    albedo_color: bpy.props.FloatVectorProperty(name='Albedo', subtype='COLOR', default=(0.9, 0.9, 0.9))
+
+    edge_color: bpy.props.FloatVectorProperty(name='Edge Color', subtype='COLOR', default=(0.9, 0.9, 0.9))
+    inner_color: bpy.props.FloatVectorProperty(name='Inner Color', subtype='COLOR', default=(0, 0, 0))
+    edge_width: bpy.props.FloatProperty(name='Edge Width', default=0.1)
+
+    checker_color_a: bpy.props.FloatVectorProperty(name='Color A', subtype='COLOR', default=(0.1, 0.1, 0.1))
+    checker_color_b: bpy.props.FloatVectorProperty(name='Color B', subtype='COLOR', default=(0.9, 0.9, 0.9))
+    square_size: bpy.props.FloatProperty(name='Square Size', default=0.5)
+
+    @classmethod
+    def register(cls):
+        bpy.types.Texture.crt = bpy.props.PointerProperty(
+            name='CRT Texture Properties',
+            description='',
+            type=cls
+        )
+    
+    @classmethod
+    def unregister(cls):
+        del bpy.types.Texture.crt
     
 
 classes = (
     CRTRenderSettings,
     CRTMaterialProperties,
+    CRTTextureProperties,
 )
 
 

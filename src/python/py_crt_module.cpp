@@ -63,7 +63,7 @@ static PyObject *render_scene_from_dict([[maybe_unused]] PyObject *self, PyObjec
     std::stringstream json_ss{ std::string { json_utf8_bytes, json_utf8_bytes + json_utf8_size } };
 
     Py_ssize_t asset_root_utf8_size;
-    const char *asset_root_utf8_bytes = PyUnicode_AsUTF8AndSize(json_unicode, &json_utf8_size);
+    const char *asset_root_utf8_bytes = PyUnicode_AsUTF8AndSize(asset_root_unicode, &asset_root_utf8_size);
     std::filesystem::path asset_root{ std::u8string {  asset_root_utf8_bytes, asset_root_utf8_bytes + asset_root_utf8_size  } };
 
     std::optional<crt::Scene> scene = crt::json::read_scene_from_istream(json_ss, asset_root);

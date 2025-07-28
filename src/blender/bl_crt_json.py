@@ -1,5 +1,6 @@
 import json
 import math
+import os
 
 import bpy
 import bmesh
@@ -25,6 +26,60 @@ def _convert_matrix(mat: Matrix) -> list[float]:
 def _convert_vector(vec: Vector) -> list[float]:
     v = _blender_to_rh_conversion @ Vector((vec.x, vec.y, vec.z, 1.0))
     return [v.x, v.y, v.z]
+
+
+def _absolute_path(filepath: str) -> str:
+    """Return absolute path for external files."""
+    if not filepath:
+        raise ValueError("Texture has no image file path")
+    if bpy.data.is_saved:
+        return os.path.abspath(bpy.path.abspath(filepath))
+    return os.path.abspath(filepath)
+
+
+def _ensure_external(image: bpy.types.Image) -> None:
+    """Raise if the image is packed or has no external file."""
+    if image.packed_file:
+        raise ValueError(f"Texture '{image.name}' is packed – external file required")
+    if not image.filepath:
+        raise ValueError(f"Texture '{image.name}' has no external file")
+
+
+def build_textures() -> list[dict]:
+    """Export all CRT textures with their custom properties."""
+    textures = []
+    for tex in bpy.data.textures:
+        if tex.type != 'IMAGE':
+            continue
+        if not hasattr(tex, 'crt') or tex.crt is None:
+            continue
+
+        crt_tex = tex.crt
+        tex_dict = {
+            'name': tex.name,
+            'type': crt_tex.type.lower()
+        }
+
+        if crt_tex.type == 'ALBEDO':
+            tex_dict['albedo'] = list(crt_tex.albedo_color)
+        elif crt_tex.type == 'EDGES':
+            tex_dict['edge_color'] = list(crt_tex.edge_color)
+            tex_dict['inner_color'] = list(crt_tex.inner_color)
+            tex_dict['edge_width'] = crt_tex.edge_width
+        elif crt_tex.type == 'CHECKER':
+            tex_dict['color_A'] = list(crt_tex.checker_color_a)
+            tex_dict['color_B'] = list(crt_tex.checker_color_b)
+            tex_dict['square_size'] = crt_tex.square_size
+        elif crt_tex.type == 'BITMAP':
+            if tex and tex.image:
+                img = tex.image
+                _ensure_external(img)
+                tex_dict['file_path'] = _absolute_path(img.filepath)
+            else:
+                raise ValueError(f"Bitmap texture '{tex.name}' has no external image")
+
+        textures.append(tex_dict)
+    return textures
 
 
 def build_settings(scene: bpy.types.Scene) -> dict:
@@ -89,7 +144,11 @@ def build_materials() -> tuple[list[dict], dict]:
             'back_face_culling': mat.use_backface_culling,
         }
         if mat.crt.type != 'REFRACTIVE':
-            material_dict['albedo'] = *mat.diffuse_color[:3],
+            tex = mat.crt.albedo_texture
+            if not tex:
+                material_dict['albedo'] = *mat.diffuse_color[:3],
+            else:
+                material_dict['albedo'] = tex.name
             print(material_dict['albedo'])
         else:
             material_dict['ior'] = mat.crt.ior
@@ -161,6 +220,7 @@ def build_scene_dict(depsgraph: bpy.types.Depsgraph) -> dict:
         'settings': build_settings(depsgraph.scene),
         'camera': build_camera(depsgraph.scene),
         'lights': build_lights(depsgraph.scene),
+        'textures': build_textures(),
         'materials': materials,
         'objects': build_objects(depsgraph, mat_index_map),
     }

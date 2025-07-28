@@ -61,7 +61,7 @@ class CRT_MATERIAL_PT_context_material(CRTButtonsPanel, bpy.types.Panel):
     @classmethod
     def poll(cls, context):
         return (context.material or context.object) and CRTButtonsPanel.poll(context)
-    
+
     def draw(self, context):
         layout = self.layout
 
@@ -93,11 +93,58 @@ class CRT_MATERIAL_PT_surface(CRTButtonsPanel, bpy.types.Panel):
         layout.use_property_split = True
         layout.prop(crt_mat, 'type')
         if crt_mat.type != 'REFRACTIVE':
-            layout.prop(mat, 'diffuse_color', text='Albedo Color')
+            row = layout.row()
+            row.enabled = crt_mat.albedo_texture is None
+            row.prop(mat, 'diffuse_color', text='Albedo Color')
         else:
             layout.prop(crt_mat, 'ior')
+
+        layout.separator()
+
         layout.prop(crt_mat, 'smooth_shading')
         layout.prop(mat, 'use_backface_culling')
+
+
+class CRT_MATERIAL_PT_albedo_texture(CRTButtonsPanel, bpy.types.Panel):
+    bl_label = 'Albedo Texture'
+    bl_context = 'material'
+    bl_parent_id = CRT_MATERIAL_PT_surface.__name__
+
+    @classmethod
+    def poll(cls, context):
+        return CRTButtonsPanel.poll(context) and context.material and context.material.crt.type != 'REFRACTIVE'
+
+    def draw(self, context):
+        layout = self.layout
+
+        mat = context.material
+        crt_mat = mat.crt
+        tex = crt_mat.albedo_texture
+
+        layout.use_property_split = True
+
+        layout.template_ID(crt_mat, 'albedo_texture', new='texture.new')
+        layout.separator()
+
+        if tex:
+            crt_tex = tex.crt
+
+            layout.prop(crt_tex, 'type')
+
+            col = layout.column()
+            if crt_tex.type == 'ALBEDO':
+                col.prop(crt_tex, 'albedo_color')
+            elif crt_tex.type == 'EDGES':
+                col.prop(crt_tex, 'edge_color')
+                col.prop(crt_tex, 'inner_color')
+                col.prop(crt_tex, 'edge_width')
+            elif crt_tex.type == 'CHECKER':
+                col = layout.column()
+                col.prop(crt_tex, 'checker_color_a')
+                col.prop(crt_tex, 'checker_color_b')
+                col.prop(crt_tex, 'square_size')
+            elif crt_tex.type == 'BITMAP':
+                col.template_ID(tex, 'image', open='image.open')
     
 
 classes = (
@@ -105,6 +152,7 @@ classes = (
     CRT_LIGHT_PT_light,
     CRT_MATERIAL_PT_context_material,
     CRT_MATERIAL_PT_surface,
+    CRT_MATERIAL_PT_albedo_texture,
 )
 
 
